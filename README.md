@@ -21,6 +21,8 @@ usb_password_manager/
 ```
 ## Notes
 
+`Setup.py` should be run only once for initialization.
+
 Not yet testable
 
 Now the `utils` part is working.
@@ -30,6 +32,10 @@ The `app.py` is not complete.
 The `extension` is empty.
 
 Once the app.py is completed, the branch should be testable by sending  requests (GET, POST, etc.)
+
+## Dependencies
+
+Run `conda env create -f environment.yml`
 
 ## TODO
 
