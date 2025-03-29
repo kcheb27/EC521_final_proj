@@ -1,0 +1,2 @@
+# EC521_final_proj
+Password_protected_usb_directory
