@@ -3,11 +3,13 @@ import psutil
 from cryptography.fernet import Fernet
 
 def find_usb_drive():
-    """Find the first mounted USB drive."""
+    """Find the first mounted USB drive, excluding system volumes."""
     partitions = psutil.disk_partitions()
     for partition in partitions:
+        # Check if the mountpoint starts with /Volumes and ensure it isn't a system volume like Recovery
         if partition.mountpoint.startswith('/Volumes/'):
-            if 'System' not in partition.mountpoint:
+            # Ignore system partitions (like Recovery, Preboot, etc.)
+            if 'Recovery' not in partition.mountpoint and 'Preboot' not in partition.mountpoint:
                 return partition.mountpoint
     return None
 
