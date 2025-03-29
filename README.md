@@ -35,7 +35,7 @@ Once the app.py is completed, the branch should be testable by sending  requests
 
 ## Dependencies
 
-Run `conda env create -f environment.yml`
+Run ```conda env create -f environment.yml``` for conda, ```pip install -r requirements.txt``` for pip.
 
 ## TODO
 
