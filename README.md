@@ -30,3 +30,7 @@ The `app.py` is not complete.
 The `extension` is empty.
 
 Once the app.py is completed, the branch should be testable by sending  requests (GET, POST, etc.)
+
+## TODO
+
+ - [ ] Use database instead of .txt files.
