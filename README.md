@@ -40,3 +40,4 @@ Run ```conda env create -f environment.yml``` for conda, ```pip install -r requi
 ## TODO
 
  - [ ] Use database instead of .txt files.
+ - [ ] Integrate USB interface operations.
