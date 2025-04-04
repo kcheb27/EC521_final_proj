@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Simple Password Manager",
     "version": "1.0",
-    "permissions": ["storage", "activeTab", "scripting"],
+    "permissions": ["storage", "downloads", "tabs", "activeTab"],
     "host_permissions": ["<all_urls>"],
     "background": {
       "service_worker": "background.js"

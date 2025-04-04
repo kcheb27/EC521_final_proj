@@ -33,4 +33,34 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   });
+
+
+// Autofill Script
+// Get the site's hostname
+const hostname = window.location.hostname;
+
+// Ask background for saved credentials
+chrome.runtime.sendMessage({ action: "getPassword", site: hostname }, (response) => {
+  if (response?.entry) {
+    const { username, password } = response.entry;
+
+    // Flexible username/email selector
+    const usernameField = document.querySelector(
+      'input[type="text"], input[type="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[name="username"]'
+    );
+
+    // Password field
+    const passwordField = document.querySelector('input[type="password"]');
+
+    if (usernameField) {
+      usernameField.value = username;
+      usernameField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    if (passwordField) {
+      passwordField.value = password;
+      passwordField.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+});
   
