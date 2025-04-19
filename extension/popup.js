@@ -1,103 +1,36 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const saveBtn = document.getElementById("save");
-  const showBtn = document.getElementById("showPassword");
-  const loadBtn = document.getElementById("loadFromUSB");
-  const saveUSBBtn = document.getElementById("saveToUSB");
-  const filePicker = document.getElementById("filePicker");
+const API = "http://localhost:5000";
+const COMM_PASS = "fixedCommPassword";   // ← 与后端一致
 
-  saveBtn.addEventListener("click", () => {
-    const site = document.getElementById("site").value;
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
+const qs = id => document.getElementById(id);
 
-    chrome.runtime.sendMessage(
-      { action: "savePassword", site, username, password },
-      (response) => {
-        if (response?.status === "success") {
-          alert("Password saved!");
-        }
-      }
-    );
+qs("saveBtn").onclick = async () => {
+  const dbPass = qs("dbPass").value.trim();
+  const site   = qs("site").value.trim();
+  const user   = qs("user").value.trim();
+  const pwd    = qs("pwd").value.trim();
+  if (!dbPass || !site || !user || !pwd) return alert("Fill all fields.");
+  /* 加密业务字段 */
+  const enc = await encryptJSON({ url: site, username: user, password: pwd }, COMM_PASS);
+  enc.db_password = dbPass;            // 供后端派生 DB key
+  const r = await fetch(`${API}/api/passwords`, {
+    method: "POST", headers: { "Content-Type":"application/json" },
+    body: JSON.stringify(enc)
   });
+  const j = await r.json();
+  alert(j.status === "added" ? "Saved." : JSON.stringify(j));
+};
 
-  showBtn.addEventListener("click", () => {
-    let site = document.getElementById("site").value.trim();
-
-    if (!site) {
-      // Get current tab's URL
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs.length > 0) {
-          try {
-            const url = new URL(tabs[0].url);
-            site = url.hostname;
-            document.getElementById("site").value = site; // Auto-fill the field
-
-            chrome.runtime.sendMessage({ action: "getPassword", site }, (response) => {
-              if (response?.entry) {
-                document.getElementById("username").value = response.entry.username;
-                document.getElementById("password").value = response.entry.password;
-              } else {
-                alert(`No password saved for ${site}`);
-              }
-            });
-          } catch (e) {
-            alert("Could not extract hostname.");
-          }
-        }
-      });
-    } else {
-      chrome.runtime.sendMessage({ action: "getPassword", site }, (response) => {
-        if (response?.entry) {
-          document.getElementById("username").value = response.entry.username;
-          document.getElementById("password").value = response.entry.password;
-        } else {
-          alert(`No password saved for ${site}`);
-        }
-      });
-    }
+qs("showBtn").onclick = async () => {
+  const dbPass = qs("dbPass").value.trim();
+  const site   = qs("site").value.trim();
+  if (!dbPass || !site) return alert("Need site & db password");
+  const r = await fetch(`${API}/api/passwords/${encodeURIComponent(site)}`, {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ db_password: dbPass, password: COMM_PASS })
   });
-
-  loadBtn.addEventListener("click", () => {
-    filePicker.click();
-  });
-
-  filePicker.addEventListener("change", (event) => {
-    const file = event.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = function (e) {
-      const text = e.target.result;
-      const entries = [];
-      const lines = text.split('\n').map(line => line.trim());
-      let currentEntry = {};
-
-      for (const line of lines) {
-        if (line.startsWith("Website:")) {
-          currentEntry.site = line.substring("Website:".length).trim();
-        } else if (line.startsWith("Username:")) {
-          currentEntry.username = line.substring("Username:".length).trim();
-        } else if (line.startsWith("Password:")) {
-          currentEntry.password = line.substring("Password:".length).trim();
-          if (currentEntry.site && currentEntry.username && currentEntry.password) {
-            entries.push(currentEntry);
-            currentEntry = {}; // Reset for the next entry
-          }
-        }
-      }
-
-      if (entries.length > 0) {
-        chrome.runtime.sendMessage({ action: "importFromUSB", data: entries }, (response) => {
-          alert(`Successfully loaded ${entries.length} passwords from USB.`);
-        });
-      } else {
-        alert("No password entries found in the file.");
-      }
-    };
-
-    reader.readAsText(file);
-  });
-
-  saveUSBBtn.addEventListener("click", () => {
-    chrome.runtime.sendMessage({ action: "exportToUSB" });
-  });
-});
+  const j = await r.json();
+  if (!j.iv) return alert("Not found.");
+  const dec = await decryptJSON(j.iv, j.ciphertext, COMM_PASS);
+  qs("user").value = dec.username;
+  qs("pwd").value  = dec.password;
+};

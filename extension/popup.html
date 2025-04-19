@@ -1,17 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Password Manager</title>
-  <script src="popup.js"></script>
+  <meta charset="utf-8" />
+  <title>Encrypted PM</title>
+  <style>
+    body { font-family: sans-serif; margin: 14px; width: 260px; }
+    input, button { width: 100%; margin: 4px 0; padding: 6px; }
+    button { cursor: pointer; }
+  </style>
+  <script src="aesUtil.js"></script>
+  <script defer src="popup.js"></script>
 </head>
 <body>
-  <input type="text" id="site" placeholder="Website">
-  <input type="text" id="username" placeholder="Username">
-  <input type="password" id="password" placeholder="Password">
-  <button id="save">Save</button>
-  <button id="showPassword">Show Password</button>
-  <button id="loadFromUSB">Load from USB</button>
-  <button id="saveToUSB">Save to USB</button>
-  <input type="file" id="filePicker" style="display: none;">
+  <input id="dbPass" type="password" placeholder="DB password" />
+  <hr>
+  <input id="site" placeholder="website.com" />
+  <input id="user" placeholder="username" />
+  <input id="pwd"  type="password" placeholder="password" />
+  <button id="saveBtn">Save</button>
+  <button id="showBtn">Show</button>
 </body>
 </html>

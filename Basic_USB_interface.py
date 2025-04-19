@@ -1,314 +1,98 @@
-import os
-import psutil
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.backends import default_backend
-import sqlite3
-import getpass
+import os, psutil, sqlite3, json, base64, getpass
 from hashlib import pbkdf2_hmac
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
-import base64
-import json
 
+# ---------- USB 帮助 ----------
 def find_usb_drive():
-    """Return the mount point of the first removable USB drive.
-
-    On macOS and most Linux distros external volumes appear under /Volumes,
-    /media/<user>, or /run/media/<user>.  On Windows we look for partitions
-    whose options include the string "removable" (psutil sets this flag on
-    USB sticks).  System volumes such as Recovery or Preboot are skipped.
-    """
     partitions = psutil.disk_partitions()
-
-    if os.name == "nt":  # Windows
+    if os.name == "nt":
         for p in partitions:
-            if 'removable' in p.opts.lower():
+            if "removable" in p.opts.lower():
                 return p.mountpoint
-    else:  # POSIX (macOS, Linux, etc.)
+    else:
         for p in partitions:
-            mnt = p.mountpoint
-            if (
-                (mnt.startswith('/Volumes/') or mnt.startswith('/media/') or mnt.startswith('/run/media/'))
-                and 'Recovery' not in mnt
-                and 'Preboot' not in mnt
-            ):
-                return mnt
-
+            m = p.mountpoint
+            if (m.startswith(("/Volumes/", "/media/", "/run/media/"))
+                and "Recovery" not in m and "Preboot" not in m):
+                return m
     return None
 
-def create_database(usb_path):
-    """Ensure a passwords.db SQLite database exists on the USB drive.
-
-    The database contains a single table `credentials`
-    with columns: id, url, username, password.
-    """
-    db_path = os.path.join(usb_path, 'passwords.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS credentials (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT NOT NULL,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL
-        );
-        '''
+# ---------- SQLite ----------
+def create_database(usb_path: str):
+    db = os.path.join(usb_path, "passwords.db")
+    conn = sqlite3.connect(db)
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS credentials(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               url TEXT NOT NULL,
+               username TEXT NOT NULL,
+               password TEXT NOT NULL );"""
     )
-    conn.commit()
-    conn.close()
-    print(f"'passwords.db' ready at: {db_path}")
+    conn.commit(); conn.close()
 
 def add_credentials(usb_path, url, username, password):
-    """Insert a new credential row into the credentials table."""
-    db_path = os.path.join(usb_path, 'passwords.db')
-
-    # Ensure the database and table exist
-    if not os.path.exists(db_path):
+    db = os.path.join(usb_path, "passwords.db")
+    if not os.path.exists(db):
         create_database(usb_path)
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO credentials (url, username, password) VALUES (?, ?, ?)",
-        (url, username, password)
-    )
-    conn.commit()
-    conn.close()
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO credentials(url,username,password) VALUES(?,?,?)",
+                 (url, username, password))
+    conn.commit(); conn.close()
 
 def show_credentials(usb_path):
-    """Print all rows in the credentials table."""
-    db_path = os.path.join(usb_path, 'passwords.db')
-    if not os.path.exists(db_path):
-        print("passwords.db not found.")
-        return
+    db = os.path.join(usb_path, "passwords.db")
+    if not os.path.exists(db):
+        print("passwords.db not found"); return
+    for i,(u,un,pw) in enumerate(sqlite3.connect(db)
+                                 .execute("SELECT url,username,password FROM credentials")
+                                 .fetchall(),1):
+        print(f"{i}. {u} – {un}:{pw}")
 
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute("SELECT url, username, password FROM credentials")
-    rows = cursor.fetchall()
-    conn.close()
+# ---------- 文件级 AES‑256‑CBC ----------
+def _check32(key: bytes): 
+    if len(key)!=32: raise ValueError("Key must be 32 bytes")
 
-    if rows:
-        print("\nStored credentials:")
-        print("-" * 50)
-        for i, (url, user, pwd) in enumerate(rows, 1):
-            print(f"{i}. URL: {url}\n   Username: {user}\n   Password: {pwd}\n")
-    else:
-        print("No credentials stored.")
+def encrypt_file(file_path, key: bytes):
+    _check32(key)
+    iv=os.urandom(16)
+    cipher=Cipher(algorithms.AES(key),modes.CBC(iv),backend=default_backend())
+    pad=padding.PKCS7(128).padder()
+    with open(file_path,"rb") as f: plain=f.read()
+    ct=cipher.encryptor().update(pad.update(plain)+pad.finalize())+cipher.encryptor().finalize()
+    with open(file_path,"wb") as f: f.write(iv+ct)
 
-def encrypt_file(file_path, key):
-    """Encrypt the database file using AES‑256‑CBC with PKCS7 padding.
+def decrypt_file(file_path, key: bytes):
+    _check32(key)
+    with open(file_path,"rb") as f: data=f.read()
+    iv,ct=data[:16],data[16:]
+    cipher=Cipher(algorithms.AES(key),modes.CBC(iv),backend=default_backend())
+    pt=cipher.decryptor().update(ct)+cipher.decryptor().finalize()
+    pt=padding.PKCS7(128).unpadder().update(pt)+padding.PKCS7(128).unpadder().finalize()
+    with open(file_path,"wb") as f: f.write(pt)
 
-    A fresh 16‑byte IV is generated and prepended to the ciphertext.
-    """
-    if len(key) != 32:
-        raise ValueError("Key must be 32 bytes (256 bits).")
+# ---------- PBKDF2 → AES key ----------
+def derive_aes_key(password:str, length:int=32, iterations:int=100_000)->bytes:
+    return pbkdf2_hmac("sha256", password.encode(), b"", iterations, dklen=length)
 
-    iv = os.urandom(16)
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    padder = padding.PKCS7(128).padder()
+# ---------- 字段级加/解密（通信加密） ----------
+def decrypt_payload(payload:dict, comm_pass:str)->dict:
+    iv=base64.b64decode(payload["iv"])
+    ct=base64.b64decode(payload["ciphertext"])
+    key=derive_aes_key(comm_pass)
+    cipher=Cipher(algorithms.AES(key),modes.CBC(iv),backend=default_backend())
+    padded=cipher.decryptor().update(ct)+cipher.decryptor().finalize()
+    data=padding.PKCS7(128).unpadder().update(padded)+padding.PKCS7(128).unpadder().finalize()
+    return json.loads(data.decode())
 
-    with open(file_path, 'rb') as f:
-        plaintext = f.read()
-
-    padded = padder.update(plaintext) + padder.finalize()
-    ciphertext = encryptor.update(padded) + encryptor.finalize()
-
-    with open(file_path, 'wb') as f:
-        f.write(iv + ciphertext)
-
-def decrypt_file(file_path, key):
-    """Decrypt the AES‑256‑CBC encrypted database file."""
-    if len(key) != 32:
-        raise ValueError("Key must be 32 bytes (256 bits).")
-
-    with open(file_path, 'rb') as f:
-        data = f.read()
-
-    iv, ciphertext = data[:16], data[16:]
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    padded_plain = decryptor.update(ciphertext) + decryptor.finalize()
-
-    unpadder = padding.PKCS7(128).unpadder()
-    plaintext = unpadder.update(padded_plain) + unpadder.finalize()
-
-    with open(file_path, 'wb') as f:
-        f.write(plaintext)
-
-def main():
-    print("Choose an option:")
-    print("1. Setup")
-    print("2. Run")
-    print("3. Add credentials (test)")
-    print("4. View credentials")
-    user_choice = input("Enter 1, 2, 3 or 4: ").strip()
-
-    if user_choice == '1':
-        # Setup: Check for USB drive and create the passwords.db file
-        usb_path = find_usb_drive()
-        if usb_path:
-            print(f"USB Drive found at: {usb_path}")
-            create_database(usb_path)
-            
-            # Ask the user for an AES key or create one
-            key_hex = getpass.getpass("Enter a 64‑hex‑character AES‑256 key (leave blank to generate one): ").strip()
-            if key_hex == "":
-                key = os.urandom(32)
-                print(f"Generated key (save this safely!): {key.hex()}")
-            else:
-                try:
-                    key = bytes.fromhex(key_hex)
-                    if len(key) != 32:
-                        raise ValueError
-                except ValueError:
-                    print("Invalid key. It must be exactly 64 hexadecimal characters.")
-                    return
-
-            file_path = os.path.join(usb_path, 'passwords.db')
-            encrypt_file(file_path, key)
-            
-        else:
-            print("No USB drive found")
-    
-    elif user_choice == '3':
-        # Test flow: add a credential via user input
-        usb_path = find_usb_drive()
-        if usb_path:
-            file_path = os.path.join(usb_path, 'passwords.db')
-            if not os.path.exists(file_path):
-                print("passwords.db does not exist on the USB drive. Please run Setup first.")
-            else:
-                key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
-                try:
-                    key_input = bytes.fromhex(key_hex)
-                    if len(key_input) != 32:
-                        raise ValueError
-                except ValueError:
-                    print("Invalid key format.")
-                    return
-
-                try:
-                    decrypt_file(file_path, key_input)
-                    print("Database decrypted.")
-                    
-                    url = input("Enter the site URL: ").strip()
-                    username = input("Enter the username: ").strip()
-                    password = getpass.getpass("Enter the password: ")
-                    
-                    add_credentials(usb_path, url, username, password)
-                    print("Credential added.")
-                    
-                    encrypt_file(file_path, key_input)
-                    print("Database re‑encrypted. Test complete.")
-                except Exception as e:
-                    print(f"Decryption failed: {e}")
-    
-    elif user_choice == '4':
-        # View credentials
-        usb_path = find_usb_drive()
-        if usb_path:
-            file_path = os.path.join(usb_path, 'passwords.db')
-            if not os.path.exists(file_path):
-                print("passwords.db does not exist on the USB drive. Please run Setup first.")
-            else:
-                key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
-                try:
-                    key_input = bytes.fromhex(key_hex)
-                    if len(key_input) != 32:
-                        raise ValueError
-                except ValueError:
-                    print("Invalid key format.")
-                    return
-
-                try:
-                    decrypt_file(file_path, key_input)
-                    print("Database decrypted.\n")
-                    show_credentials(usb_path)
-                    encrypt_file(file_path, key_input)
-                    print("Database re‑encrypted.")
-                except Exception as e:
-                    print(f"Decryption failed: {e}")
-        else:
-            print("No USB drive found")
-    
-    elif user_choice == '2':
-        # Run: Accept a symmetric key and decrypt the file
-        key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
-        try:
-            key_input = bytes.fromhex(key_hex)
-            if len(key_input) != 32:
-                raise ValueError
-        except ValueError:
-            print("Invalid key format.")
-            return
-            
-        usb_path = find_usb_drive()
-        if usb_path:
-            file_path = os.path.join(usb_path, 'passwords.db')
-            if os.path.exists(file_path):
-                decrypt_file(file_path, key_input)
-                print("File decrypted successfully.")
-                
-                # Keep running until user presses 'x'
-                while True:
-                    action = input("Press 'x' to re-encrypt and exit, or any key to keep the file decrypted: ").strip().lower()
-                    if action == 'x':
-                        encrypt_file(file_path, key_input)
-                        print(f"File encrypted again. Program will now exit.")
-                        break
-            else:
-                print("passwords.db does not exist on the USB drive.")
-        else:
-            print("No USB drive found")
-    
-    else:
-        print("Invalid choice. Please select 1, 2, 3 or 4.")
-
-    
-
-
-def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -> bytes:
-    return pbkdf2_hmac('sha256', password.encode(), b'', iterations, dklen=length)
-
-def decrypt_payload(payload: dict, password: str) -> dict:
-    iv = base64.b64decode(payload["iv"])
-    ciphertext = base64.b64decode(payload["ciphertext"])
-    key = derive_aes_key(password)
-
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    padded_data = decryptor.update(ciphertext) + decryptor.finalize()
-    unpadder = padding.PKCS7(128).unpadder()
-    plaintext = unpadder.update(padded_data) + unpadder.finalize()
-
-    return json.loads(plaintext.decode())
-
-def encrypt_response(data: dict, password: str) -> dict:
-    """Encrypt response data (dict) using AES-CBC derived from password (PBKDF2, no salt)."""
-    from Basic_USB_interface import derive_aes_key  # 确保你的函数导出了
-
-    key = derive_aes_key(password)
-    iv = os.urandom(16)
-
-    # Convert dict to padded JSON bytes
-    plaintext = json.dumps(data).encode()
-    padder = padding.PKCS7(128).padder()
-    padded = padder.update(plaintext) + padder.finalize()
-
-    # AES-CBC encryption
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    ciphertext = encryptor.update(padded) + encryptor.finalize()
-
-    return {
-        "iv": base64.b64encode(iv).decode(),
-        "ciphertext": base64.b64encode(ciphertext).decode()
-    }
-
-if __name__ == '__main__':
-    main()
+def encrypt_response(data:dict, comm_pass:str)->dict:
+    key=derive_aes_key(comm_pass)
+    iv=os.urandom(16)
+    raw=json.dumps(data).encode()
+    padded=padding.PKCS7(128).padder().update(raw)+padding.PKCS7(128).padder().finalize()
+    ct=Cipher(algorithms.AES(key),modes.CBC(iv),backend=default_backend())\
+        .encryptor().update(padded)+Cipher(algorithms.AES(key),modes.CBC(iv),backend=default_backend())\
+        .encryptor().finalize()
+    return {"iv":base64.b64encode(iv).decode(),
+            "ciphertext":base64.b64encode(ct).decode()}
