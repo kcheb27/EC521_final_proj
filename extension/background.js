@@ -1,80 +1,112 @@
+// background.js – service‑worker (Manifest v3)
+// Talks to FastAPI backend at http://127.0.0.1:5000
+
+const API_BASE = "http://127.0.0.1:5000";
+
+/* ---------- helper ---------- */
+async function getMasterKey() {
+  const { masterKey } = await chrome.storage.local.get("masterKey");
+  return masterKey || "";
+}
+
+/* ---------- message router ---------- */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "savePassword") {
-    const { site, username, password } = request;
-    chrome.storage.local.get("passwords", (data) => {
-      const passwords = data.passwords || {};
-      passwords[site] = { username, password };
-      chrome.storage.local.set({ passwords }, () => {
-        sendResponse({ status: "success" });
-      });
-    });
-    return true;
-  }
-
-  if (request.action === "getPassword") {
-    const { site } = request;
-    chrome.storage.local.get("passwords", (data) => {
-      const entry = data.passwords?.[site];
-      sendResponse({ entry });
-    });
-    return true;
-  }
-
-  if (request.action === "importFromUSB") {
-    const newData = request.data;
-    const importedPasswords = {};
-  
-    newData.forEach(({ site, username, password }) => {
-      importedPasswords[site] = { username, password };
-    });
-  
-    // Merge with existing passwords (optional — if you don’t want to overwrite)
-    chrome.storage.local.get("passwords", (data) => {
-      const existingPasswords = data.passwords || {};
-      const mergedPasswords = { ...existingPasswords, ...importedPasswords };
-  
-      chrome.storage.local.set({ passwords: mergedPasswords }, () => {
-        sendResponse({ status: "imported", count: newData.length });
-      });
-    });
-  
-    return true;
-  }
-
-  if (request.action === "exportToUSB") {
-    chrome.storage.local.get("passwords", (data) => {
-      // Format as plain text
-      let txtContent = "=== Saved Passwords ===\n\n";
-      
-      const entries = Object.entries(data.passwords || {});
-      
-      if (entries.length === 0) {
-        txtContent += "No passwords stored yet.";
-      } else {
-        entries.forEach(([site, {username, password}], index) => {
-          txtContent += `Entry #${index + 1}\n`;
-          txtContent += `Website: ${site}\n`;
-          txtContent += `Username: ${username}\n`;
-          txtContent += `Password: ${password}\n\n`;
-        });
-        txtContent += `=== Total: ${entries.length} passwords ===`;
-      }
-
-      // Create download using chrome.downloads API
-      chrome.downloads.download({
-        url: "data:text/plain;charset=utf-8," + encodeURIComponent(txtContent),
-        filename: "my_passwords.txt",
-        saveAs: true,
-        conflictAction: "uniquify"
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.error("Download failed:", chrome.runtime.lastError);
-          sendResponse({ status: "error", message: chrome.runtime.lastError.message });
-        } else {
+  /* wrap each handler in an async IIFE so we can use await */
+  switch (request.action) {
+    /* save credentials */
+    case "savePassword":
+      (async () => {
+        try {
+          const key = await getMasterKey();
+          if (!key) throw new Error("Master key not set.");
+          await fetch(`${API_BASE}/savePassword`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              site: request.site,
+              username: request.username,
+              password: request.password,
+              masterKey: key
+            })
+          });
           sendResponse({ status: "success" });
+        } catch (e) {
+          sendResponse({ status: "error", message: e.message });
         }
-      });
-    });
-    return true;
+      })();
+      return true;
+
+    /* retrieve credentials */
+    case "getPassword":
+      (async () => {
+        try {
+          const key = await getMasterKey();
+          if (!key) throw new Error("Master key not set.");
+          const r = await fetch(
+            `${API_BASE}/getPassword/${encodeURIComponent(request.site)}?key=${key}`
+          );
+          const data = await r.json(); // { entry: {...} | null }
+          sendResponse(data);
+        } catch (e) {
+          sendResponse({ entry: null, message: e.message });
+        }
+      })();
+      return true;
+
+    /* import list from text file */
+    case "importFromUSB":
+      (async () => {
+        try {
+          const key = await getMasterKey();
+          if (!key) throw new Error("Master key not set.");
+          const r = await fetch(`${API_BASE}/importFromUSB`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: request.data,
+              masterKey: key
+            })
+          });
+          const data = await r.json(); // { status, count }
+          sendResponse(data);
+        } catch (e) {
+          sendResponse({ status: "error", message: e.message });
+        }
+      })();
+      return true;
+
+    /* export text file & trigger download */
+    case "exportToUSB":
+      (async () => {
+        try {
+          const key = await getMasterKey();
+          if (!key) throw new Error("Master key not set.");
+          const r = await fetch(`${API_BASE}/exportToUSB?key=${key}`);
+          const txt = await r.text();
+          const url =
+            "data:text/plain;charset=utf-8," + encodeURIComponent(txt);
+          chrome.downloads.download(
+            {
+              url,
+              filename: "my_passwords.txt",
+              saveAs: true,
+              conflictAction: "uniquify"
+            },
+            () => {
+              if (chrome.runtime.lastError) {
+                sendResponse({
+                  status: "error",
+                  message: chrome.runtime.lastError.message
+                });
+              } else {
+                sendResponse({ status: "success" });
+              }
+            }
+          );
+        } catch (e) {
+          sendResponse({ status: "error", message: e.message });
+        }
+      })();
+      return true;
   }
 });

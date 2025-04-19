@@ -1,99 +1,104 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Password Manager</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary: #4F46E5;
-      --primary-dark: #4338CA;
-      --bg: #F3F4F6;
-      --surface: #FFFFFF;
-      --text: #111827;
-      --radius: 10px;
-    }
- 
-    * {
-      box-sizing: border-box;
-      font-family: 'Inter', sans-serif;
-    }
- 
-    body {
-      margin: 0;
-      padding: 20px;
-      background: var(--bg);
-      color: var(--text);
-    }
- 
-    .card {
-      background: var(--surface);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      width: 260px;
-    }
- 
-    input[type="text"],
-    input[type="password"] {
-      padding: 10px 12px;
-      border: 1px solid #D1D5DB;
-      border-radius: var(--radius);
-      outline: none;
-      transition: border 0.2s;
-    }
- 
-    input[type="text"]:focus,
-    input[type="password"]:focus {
-      border-color: var(--primary);
-    }
- 
-    button {
-      padding: 10px 14px;
-      border: none;
-      border-radius: var(--radius);
-      background: var(--primary);
-      color: #FFFFFF;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
-    }
- 
-    button:hover {
-      background: var(--primary-dark);
-    }
- 
-    button:active {
-      transform: translateY(1px);
-    }
- 
-    /* minor button variations */
-    #showPassword { background: #10B981; }
-    #showPassword:hover { background: #059669; }
-    #loadFromUSB { background: #F59E0B; }
-    #loadFromUSB:hover { background: #D97706; }
-    #saveToUSB { background: #EF4444; }
-    #saveToUSB:hover { background: #DC2626; }
- 
-    #filePicker {
-      display: none;
-    }
-  </style>
-  <script src="popup.js"></script>
-</head>
-<body>
-  <div class="card">
-    <input type="text" id="site" placeholder="Website">
-    <input type="text" id="username" placeholder="Username">
-    <input type="password" id="password" placeholder="Password">
-    <button id="save">Save</button>
-    <button id="showPassword">Show Password</button>
-    <button id="loadFromUSB">Load from USB</button>
-    <button id="saveToUSB">Save to USB</button>
-    <input type="file" id="filePicker">
-  </div>
-</body>
+  <head>
+    <title>Password Manager</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #4f46e5;
+        --primary-dark: #4338ca;
+        --bg: #f3f4f6;
+        --surface: #ffffff;
+        --text: #111827;
+        --radius: 10px;
+      }
+      * {
+        box-sizing: border-box;
+        font-family: "Inter", sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .card {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 280px;
+      }
+      input[type="text"],
+      input[type="password"] {
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: var(--radius);
+        outline: none;
+        transition: border 0.2s;
+      }
+      input[type="text"]:focus,
+      input[type="password"]:focus {
+        border-color: var(--primary);
+      }
+      button {
+        padding: 10px 14px;
+        border: none;
+        border-radius: var(--radius);
+        background: var(--primary);
+        color: #ffffff;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.1s;
+      }
+      button:hover {
+        background: var(--primary-dark);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      /* color variations */
+      #showPassword { background: #10b981; }
+      #showPassword:hover { background: #059669; }
+      #loadFromUSB { background: #f59e0b; }
+      #loadFromUSB:hover { background: #d97706; }
+      #saveToUSB { background: #ef4444; }
+      #saveToUSB:hover { background: #dc2626; }
+
+      #filePicker { display: none; }
+    </style>
+    <script src="popup.js"></script>
+  </head>
+  <body>
+    <div class="card">
+      <input type="text" id="site" placeholder="Website" />
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button id="save">Save</button>
+      <button id="showPassword">Show Password</button>
+
+      <hr />
+
+      <input
+        type="text"
+        id="masterKey"
+        placeholder="64‑hex master key"
+        autocomplete="off"
+      />
+      <button id="setKey">Set Master Key</button>
+
+      <hr />
+
+      <button id="loadFromUSB">Load from USB</button>
+      <button id="saveToUSB">Save to USB</button>
+      <input type="file" id="filePicker" />
+    </div>
+  </body>
 </html>
