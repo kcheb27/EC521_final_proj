@@ -67,12 +67,22 @@ def add_credentials(usb_path, url, username, password):
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO credentials (url, username, password) VALUES (?, ?, ?)",
-        (url, username, password)
-    )
-    conn.commit()
-    conn.close()
+    
+    cursor.execute("SELECT EXISTS(SELECT 1 FROM credentials WHERE url=? AND username=?)", (url, username))
+    exists = cursor.fetchone()[0]
+    
+    if exists:
+        print(f"Credentials already exist for {username} @ {url}.")
+        return
+    else:
+        # Insert a brand‑new row
+        cursor.execute(
+            "INSERT INTO credentials (url, username, password) VALUES (?, ?, ?)",
+            (url, username, password)
+        )
+        conn.commit()
+        conn.close()
+        print(f"Credentials added for {username} @ {url}")
 
 def show_credentials(usb_path):
     """Print all rows in the credentials table."""
