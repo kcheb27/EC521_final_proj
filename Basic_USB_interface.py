@@ -83,6 +83,24 @@ def add_credentials(usb_path, url, username, password):
         conn.commit()
         conn.close()
         print(f"Credentials added for {username} @ {url}")
+        
+def overwrite_credentials(usb_path, url, username, password):
+    """Overwrite an existing credential for the given URL and username."""
+    db_path = os.path.join(usb_path, 'passwords.db')
+    if not os.path.exists(db_path):
+        print("passwords.db not found. Cannot overwrite.")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE credentials SET password = ? WHERE url = ? AND username = ?",
+        (password, url, username)
+    )
+    conn.commit()
+    conn.close()
+    print(f"Credentials updated for {username} @ {url}")
+
 
 def show_credentials(usb_path):
     """Print all rows in the credentials table."""
