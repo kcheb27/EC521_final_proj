@@ -113,25 +113,37 @@ app.add_middleware(
 # ---------- API routes ----------------------------------------------
 @app.post("/savePassword")
 def save_password(data: dict):
-    site = data.get("site")
-    username = data.get("username")
-    pw = data.get("password")
-    key = data.get("masterKey")
+    site      = data.get("site")
+    username  = data.get("username")
+    pw        = data.get("password")
+    key       = data.get("masterKey")
+    force     = bool(data.get("force"))          # allow optional overwrite
 
     if not all([site, username, pw, key]):
         raise HTTPException(400, "site, username, password, masterKey required")
 
-    def _insert(conn: sqlite3.Connection):
-        conn.execute(
+    def _upsert(conn: sqlite3.Connection):
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM credentials WHERE url = ? AND username = ?",
+            (site, username),
+        )
+        exists = cur.fetchone() is not None
+
+        if exists and not force:
+            return {"status": "exists"}          # tell frontend “already there”
+
+        cur.execute(
             """
             INSERT OR REPLACE INTO credentials (url, username, password)
             VALUES (?,?,?)
             """,
             (site, username, pw),
         )
+        return {"status": "overwritten" if exists else "success"}
 
-    _with_decrypted_db(key, _insert)
-    return {"status": "success"}
+    # send the callback's result straight to the client
+    return _with_decrypted_db(key, _upsert)
 
 
 @app.get("/getPassword/{site}")
