@@ -6,12 +6,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --primary: #4F46E5;
-      --primary-dark: #4338CA;
-      --bg: #F3F4F6;
+      --primary: #1E3A8A;        /* deep indigo */
+      --primary-dark: #1E40AF;
+      --accent: #38BDF8;         /* sky */
+      --bg: #F8FAFC;             /* very light slate */
       --surface: #FFFFFF;
-      --text: #111827;
-      --radius: 10px;
+      --text: #0F172A;           /* slate‑900 */
+      --radius: 8px;             /* slightly squarish */
     }
  
     * {
@@ -28,13 +29,14 @@
  
     .card {
       background: var(--surface);
+      border: 1px solid #E2E8F0;
       border-radius: var(--radius);
       padding: 20px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      width: 260px;
+      gap: 16px;
+      width: 300px;
     }
  
     input[type="text"],
@@ -43,6 +45,7 @@
       border: 1px solid #D1D5DB;
       border-radius: var(--radius);
       outline: none;
+      background: #F1F5F9;
       transition: border 0.2s;
     }
  
@@ -71,21 +74,31 @@
     }
  
     /* minor button variations */
-    #showPassword { background: #10B981; }
-    #showPassword:hover { background: #059669; }
+    #showPassword { background: var(--accent); }
+    #showPassword:hover { background: #0EA5E9; }
     #loadFromUSB { background: #F59E0B; }
     #loadFromUSB:hover { background: #D97706; }
     #saveToUSB { background: #EF4444; }
     #saveToUSB:hover { background: #DC2626; }
  
     #filePicker {
-      display: none;
+    }
+    
+    .logo {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+      align-self: center;
+      margin-bottom: 4px;
+      user-select: none;
     }
   </style>
   <script src="popup.js"></script>
 </head>
 <body>
   <div class="card">
+    <div class="logo">UPass</div>
     <input type="text" id="site" placeholder="Website">
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
