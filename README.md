@@ -9,4 +9,12 @@ For the USB interface program to work:
 
 #
 add checking / prompting if usr for site alrdy exists
-    
+
+# TO-DO list
+
+1. initializing database function
+2. fix weird text when overwriting (optional)
+3. salt+hash passwords
+4. package everything and get it ready for deployment
+5. Update README.md
+6. Slides
