@@ -22,9 +22,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "importFromUSB") {
     const newData = request.data;
-    chrome.storage.local.set({ passwords: newData }, () => {
-      sendResponse({ status: "imported" });
+    const importedPasswords = {};
+  
+    newData.forEach(({ site, username, password }) => {
+      importedPasswords[site] = { username, password };
     });
+  
+    // Merge with existing passwords (optional — if you don’t want to overwrite)
+    chrome.storage.local.get("passwords", (data) => {
+      const existingPasswords = data.passwords || {};
+      const mergedPasswords = { ...existingPasswords, ...importedPasswords };
+  
+      chrome.storage.local.set({ passwords: mergedPasswords }, () => {
+        sendResponse({ status: "imported", count: newData.length });
+      });
+    });
+  
     return true;
   }
 
