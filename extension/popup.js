@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showBtn.addEventListener("click", () => {
     let site = document.getElementById("site").value.trim();
-  
+
     if (!site) {
       // Get current tab's URL
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const url = new URL(tabs[0].url);
             site = url.hostname;
             document.getElementById("site").value = site; // Auto-fill the field
-  
+
             chrome.runtime.sendMessage({ action: "getPassword", site }, (response) => {
               if (response?.entry) {
                 document.getElementById("username").value = response.entry.username;
@@ -66,13 +66,31 @@ document.addEventListener("DOMContentLoaded", () => {
     const reader = new FileReader();
 
     reader.onload = function (e) {
-      try {
-        const data = JSON.parse(e.target.result);
-        chrome.runtime.sendMessage({ action: "importFromUSB", data }, (response) => {
-          alert("Passwords loaded from USB.");
+      const text = e.target.result;
+      const entries = [];
+      const lines = text.split('\n').map(line => line.trim());
+      let currentEntry = {};
+
+      for (const line of lines) {
+        if (line.startsWith("Website:")) {
+          currentEntry.site = line.substring("Website:".length).trim();
+        } else if (line.startsWith("Username:")) {
+          currentEntry.username = line.substring("Username:".length).trim();
+        } else if (line.startsWith("Password:")) {
+          currentEntry.password = line.substring("Password:".length).trim();
+          if (currentEntry.site && currentEntry.username && currentEntry.password) {
+            entries.push(currentEntry);
+            currentEntry = {}; // Reset for the next entry
+          }
+        }
+      }
+
+      if (entries.length > 0) {
+        chrome.runtime.sendMessage({ action: "importFromUSB", data: entries }, (response) => {
+          alert(`Successfully loaded ${entries.length} passwords from USB.`);
         });
-      } catch (err) {
-        alert("Invalid file format.");
+      } else {
+        alert("No password entries found in the file.");
       }
     };
 
