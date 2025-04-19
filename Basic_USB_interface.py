@@ -57,6 +57,22 @@ def create_database(usb_path):
     conn.close()
     print(f"'passwords.db' ready at: {db_path}")
 
+def check_if_database_exists(usb_path):
+    """
+    Check whether the `passwords.db` database already exists on the USB drive.
+    
+    Returns
+    -------
+    str
+        "database already exists"   – if the file is present  
+        "database doesn't exist"    – if the file is not present
+    """
+    db_path = os.path.join(usb_path, 'passwords.db')
+    if os.path.exists(db_path):
+        return "database already exists"
+    else:
+        return "database doesn't exist"
+
 def add_credentials(usb_path, url, username, password):
     """Insert a new credential row into the credentials table."""
     db_path = os.path.join(usb_path, 'passwords.db')
