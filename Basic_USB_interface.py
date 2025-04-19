@@ -5,6 +5,8 @@ from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.backends import default_backend
 import sqlite3
 import getpass
+from hashlib import pbkdf2_hmac
+import base64
 
 def find_usb_drive():
     """Return the mount point of the first removable USB drive.
@@ -262,6 +264,24 @@ def main():
     
     else:
         print("Invalid choice. Please select 1, 2, 3 or 4.")
+
+    
+
+
+def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -> str:
+    """
+    Derive an AES key from a password for communication between frontend and backend
+    This makes the same password always generate the same key.
+    """
+    salt = b''  # No salt
+    key = pbkdf2_hmac(
+        hash_name='sha256',
+        password=password.encode(),
+        salt=salt,
+        iterations=iterations,
+        dklen=length
+    )
+    return base64.urlsafe_b64encode(key).decode()
 
 if __name__ == '__main__':
     main()
