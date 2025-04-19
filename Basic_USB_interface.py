@@ -1,115 +1,201 @@
 import os
 import psutil
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+import sqlite3
+import getpass
 
 def find_usb_drive():
-    """Find the first mounted USB drive, excluding system volumes."""
+    """Return the mount point of the first removable USB drive.
+
+    On macOS and most Linux distros external volumes appear under /Volumes,
+    /media/<user>, or /run/media/<user>.  On Windows we look for partitions
+    whose options include the string "removable" (psutil sets this flag on
+    USB sticks).  System volumes such as Recovery or Preboot are skipped.
+    """
     partitions = psutil.disk_partitions()
-    for partition in partitions:
-        # Check if the mountpoint starts with /Volumes and ensure it isn't a system volume like Recovery
-        if partition.mountpoint.startswith('/Volumes/'):
-            # Ignore system partitions (like Recovery, Preboot, etc.)
-            if 'Recovery' not in partition.mountpoint and 'Preboot' not in partition.mountpoint:
-                return partition.mountpoint
+
+    if os.name == "nt":  # Windows
+        for p in partitions:
+            if 'removable' in p.opts.lower():
+                return p.mountpoint
+    else:  # POSIX (macOS, Linux, etc.)
+        for p in partitions:
+            mnt = p.mountpoint
+            if (
+                (mnt.startswith('/Volumes/') or mnt.startswith('/media/') or mnt.startswith('/run/media/'))
+                and 'Recovery' not in mnt
+                and 'Preboot' not in mnt
+            ):
+                return mnt
+
     return None
 
-def create_password_file(usb_path):
-    """Ensure a passwords.txt file exists on the USB drive.
+def create_database(usb_path):
+    """Ensure a passwords.db SQLite database exists on the USB drive.
 
-    The function simply creates an empty file if one is not already present.
+    The database contains a single table `credentials`
+    with columns: id, url, username, password.
     """
-    file_path = os.path.join(usb_path, 'passwords.txt')
+    db_path = os.path.join(usb_path, 'passwords.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL
+        );
+        '''
+    )
+    conn.commit()
+    conn.close()
+    print(f"'passwords.db' ready at: {db_path}")
 
-    # If the file doesn't exist, create it
-    if not os.path.exists(file_path):
-        try:
-            # Create an empty file
-            with open(file_path, 'w'):
-                pass
-            print(f"'passwords.txt' created at: {file_path}")
-        except Exception as e:
-            print(f"An error occurred while creating passwords.txt: {e}")
-    else:
-        print("'passwords.txt' already exists.")
+def add_credentials(usb_path, url, username, password):
+    """Insert a new credential row into the credentials table."""
+    db_path = os.path.join(usb_path, 'passwords.db')
 
-def add_credentials(usb_path, username, password):
-    """Append a username/password pair to passwords.txt on the USB drive.
+    # Ensure the database and table exist
+    if not os.path.exists(db_path):
+        create_database(usb_path)
 
-    The entry is written as: <username> : <password>
-    """
-    file_path = os.path.join(usb_path, 'passwords.txt')
-
-    # Make sure the file exists
-    if not os.path.exists(file_path):
-        create_password_file(usb_path)
-
-    # Append the new credentials
-    with open(file_path, 'a') as file:
-        file.write(f"{username} : {password}\n")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO credentials (url, username, password) VALUES (?, ?, ?)",
+        (url, username, password)
+    )
+    conn.commit()
+    conn.close()
 
 def encrypt_file(file_path, key):
-    """Encrypt the passwords.txt file using Fernet symmetric encryption."""
-    fernet = Fernet(key)
-    
-    # Read the file's contents
-    with open(file_path, 'rb') as file:
-        file_data = file.read()
-    
-    # Encrypt the data
-    encrypted_data = fernet.encrypt(file_data)
-    
-    # Write the encrypted data back to the file
-    with open(file_path, 'wb') as file:
-        file.write(encrypted_data)
+    """Encrypt the database file using AES‑256‑CBC with PKCS7 padding.
+
+    A fresh 16‑byte IV is generated and prepended to the ciphertext.
+    """
+    if len(key) != 32:
+        raise ValueError("Key must be 32 bytes (256 bits).")
+
+    iv = os.urandom(16)
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    padder = padding.PKCS7(128).padder()
+
+    with open(file_path, 'rb') as f:
+        plaintext = f.read()
+
+    padded = padder.update(plaintext) + padder.finalize()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+
+    with open(file_path, 'wb') as f:
+        f.write(iv + ciphertext)
 
 def decrypt_file(file_path, key):
-    """Decrypt the passwords.txt file using the provided symmetric key."""
-    fernet = Fernet(key)
-    
-    # Read the encrypted file's contents
-    with open(file_path, 'rb') as file:
-        encrypted_data = file.read()
-    
-    # Decrypt the data
-    decrypted_data = fernet.decrypt(encrypted_data)
-    
-    # Write the decrypted data back to the file
-    with open(file_path, 'wb') as file:
-        file.write(decrypted_data)
+    """Decrypt the AES‑256‑CBC encrypted database file."""
+    if len(key) != 32:
+        raise ValueError("Key must be 32 bytes (256 bits).")
 
-def generate_symmetric_key():
-    """Generate a symmetric key for encryption and decryption."""
-    key = Fernet.generate_key()
-    print(f"Symmetric Key (Save this for later): {key.decode()}")
-    return key
+    with open(file_path, 'rb') as f:
+        data = f.read()
+
+    iv, ciphertext = data[:16], data[16:]
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_plain = decryptor.update(ciphertext) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(128).unpadder()
+    plaintext = unpadder.update(padded_plain) + unpadder.finalize()
+
+    with open(file_path, 'wb') as f:
+        f.write(plaintext)
 
 def main():
     print("Choose an option:")
     print("1. Setup")
     print("2. Run")
-    user_choice = input("Enter 1 or 2: ").strip()
+    print("3. Add credentials (test)")
+    user_choice = input("Enter 1, 2 or 3: ").strip()
 
     if user_choice == '1':
-        # Setup: Check for USB drive and create the passwords.txt file
+        # Setup: Check for USB drive and create the passwords.db file
         usb_path = find_usb_drive()
         if usb_path:
             print(f"USB Drive found at: {usb_path}")
-            create_password_file(usb_path)
+            create_database(usb_path)
             
-            # Encrypt the file using a symmetric key
-            key = generate_symmetric_key()
-            file_path = os.path.join(usb_path, 'passwords.txt')
+            # Ask the user for an AES key or create one
+            key_hex = getpass.getpass("Enter a 64‑hex‑character AES‑256 key (leave blank to generate one): ").strip()
+            if key_hex == "":
+                key = os.urandom(32)
+                print(f"Generated key (save this safely!): {key.hex()}")
+            else:
+                try:
+                    key = bytes.fromhex(key_hex)
+                    if len(key) != 32:
+                        raise ValueError
+                except ValueError:
+                    print("Invalid key. It must be exactly 64 hexadecimal characters.")
+                    return
+
+            file_path = os.path.join(usb_path, 'passwords.db')
             encrypt_file(file_path, key)
             
         else:
             print("No USB drive found")
     
-    elif user_choice == '2':
-        # Run: Accept a symmetric key and decrypt the file
-        key_input = input("Enter the symmetric key for decryption: ").encode()
+    elif user_choice == '3':
+        # Test flow: add a credential via user input
         usb_path = find_usb_drive()
         if usb_path:
-            file_path = os.path.join(usb_path, 'passwords.txt')
+            file_path = os.path.join(usb_path, 'passwords.db')
+            if not os.path.exists(file_path):
+                print("passwords.db does not exist on the USB drive. Please run Setup first.")
+            else:
+                key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
+                try:
+                    key_input = bytes.fromhex(key_hex)
+                    if len(key_input) != 32:
+                        raise ValueError
+                except ValueError:
+                    print("Invalid key format.")
+                    return
+
+                try:
+                    decrypt_file(file_path, key_input)
+                    print("Database decrypted.")
+                    
+                    url = input("Enter the site URL: ").strip()
+                    username = input("Enter the username: ").strip()
+                    password = getpass.getpass("Enter the password: ")
+                    
+                    add_credentials(usb_path, url, username, password)
+                    print("Credential added.")
+                    
+                    encrypt_file(file_path, key_input)
+                    print("Database re‑encrypted. Test complete.")
+                except Exception as e:
+                    print(f"Decryption failed: {e}")
+        else:
+            print("No USB drive found")
+    
+    elif user_choice == '2':
+        # Run: Accept a symmetric key and decrypt the file
+        key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
+        try:
+            key_input = bytes.fromhex(key_hex)
+            if len(key_input) != 32:
+                raise ValueError
+        except ValueError:
+            print("Invalid key format.")
+            return
+            
+        usb_path = find_usb_drive()
+        if usb_path:
+            file_path = os.path.join(usb_path, 'passwords.db')
             if os.path.exists(file_path):
                 decrypt_file(file_path, key_input)
                 print("File decrypted successfully.")
@@ -122,12 +208,12 @@ def main():
                         print(f"File encrypted again. Program will now exit.")
                         break
             else:
-                print("passwords.txt does not exist on the USB drive.")
+                print("passwords.db does not exist on the USB drive.")
         else:
             print("No USB drive found")
     
     else:
-        print("Invalid choice. Please select either 1 or 2.")
+        print("Invalid choice. Please select 1, 2 or 3.")
 
 if __name__ == '__main__':
     main()
