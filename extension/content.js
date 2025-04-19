@@ -64,3 +64,31 @@ chrome.runtime.sendMessage({ action: "getPassword", site: hostname }, (response)
   }
 });
   
+// Listen for form submissions on the page
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+
+  // Find username and password fields inside the submitted form
+  const usernameField = form.querySelector(
+    'input[type="text"], input[type="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[name="username"]'
+  );
+  const passwordField = form.querySelector('input[type="password"]');
+
+  if (usernameField && passwordField) {
+    const site = window.location.hostname;
+    const username = usernameField.value;
+    const password = passwordField.value;
+
+    // Send captured credentials to background.js for saving
+    chrome.runtime.sendMessage({
+      action: "savePassword",
+      site,
+      username,
+      password,
+    }, (response) => {
+      if (response?.status === "success") {
+        console.log(`✅ Saved password for ${site}`);
+      }
+    });
+  }
+});

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Simple Password Manager",
   "version": "1.1",
-  "description": "Stores site credentials on an AES‑encrypted USB database via a local FastAPI service.",
+  "description": "Stores site credentials on an AES-encrypted USB database via a local FastAPI service.",
   "permissions": ["storage", "downloads", "tabs", "activeTab"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js" },
