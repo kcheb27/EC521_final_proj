@@ -1,103 +1,112 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const saveBtn = document.getElementById("save");
-  const showBtn = document.getElementById("showPassword");
-  const loadBtn = document.getElementById("loadFromUSB");
-  const saveUSBBtn = document.getElementById("saveToUSB");
-  const filePicker = document.getElementById("filePicker");
+  const qs = (id) => document.getElementById(id);
 
-  saveBtn.addEventListener("click", () => {
-    const site = document.getElementById("site").value;
-    const username = document.getElementById("username").value;
-    const password = document.getElementById("password").value;
-
-    chrome.runtime.sendMessage(
-      { action: "savePassword", site, username, password },
-      (response) => {
-        if (response?.status === "success") {
-          alert("Password saved!");
-        }
-      }
-    );
+  /* ---------- master‑key handling ---------- */
+  chrome.storage.local.get("masterKey", ({ masterKey }) => {
+    if (masterKey) qs("masterKey").value = masterKey;
   });
 
-  showBtn.addEventListener("click", () => {
-    let site = document.getElementById("site").value.trim();
+  qs("setKey").onclick = () => {
+    const key = qs("masterKey").value.trim();
+    if (key.length !== 64 || !/^[0-9a-fA-F]+$/.test(key)) {
+      return alert("Key must be 64 hexadecimal characters.");
+    }
+    chrome.storage.local.set({ masterKey: key }, () => alert("Key saved."));
+  };
 
-    if (!site) {
-      // Get current tab's URL
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs.length > 0) {
-          try {
-            const url = new URL(tabs[0].url);
-            site = url.hostname;
-            document.getElementById("site").value = site; // Auto-fill the field
+  /* ---------- save credentials ---------- */
+  qs("save").onclick = () => {
+    chrome.runtime.sendMessage(
+      {
+        action: "savePassword",
+        site: qs("site").value.trim(),
+        username: qs("username").value,
+        password: qs("password").value
+      },
+      (r) => {
+        if (r?.status === "success") alert("Password saved!");
+        else alert(`Error: ${r?.message || "unknown"}`);
+      }
+    );
+  };
 
-            chrome.runtime.sendMessage({ action: "getPassword", site }, (response) => {
-              if (response?.entry) {
-                document.getElementById("username").value = response.entry.username;
-                document.getElementById("password").value = response.entry.password;
-              } else {
-                alert(`No password saved for ${site}`);
-              }
-            });
-          } catch (e) {
-            alert("Could not extract hostname.");
-          }
+  /* ---------- show credentials ---------- */
+  qs("showPassword").onclick = () => {
+    let site = qs("site").value.trim();
+
+    const fillFields = (entry) => {
+      qs("username").value = entry.username;
+      qs("password").value = entry.password;
+    };
+
+    const fetchSite = (hostname) =>
+      chrome.runtime.sendMessage(
+        { action: "getPassword", site: hostname },
+        (resp) => {
+          resp?.entry
+            ? fillFields(resp.entry)
+            : alert(`No password saved for ${hostname}`);
         }
-      });
+      );
+
+    if (site) {
+      fetchSite(site);
     } else {
-      chrome.runtime.sendMessage({ action: "getPassword", site }, (response) => {
-        if (response?.entry) {
-          document.getElementById("username").value = response.entry.username;
-          document.getElementById("password").value = response.entry.password;
-        } else {
-          alert(`No password saved for ${site}`);
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const url = tabs[0]?.url;
+        if (!url) return;
+        try {
+          site = new URL(url).hostname;
+          qs("site").value = site;
+          fetchSite(site);
+        } catch {
+          alert("Unable to extract hostname.");
         }
       });
     }
-  });
+  };
 
-  loadBtn.addEventListener("click", () => {
-    filePicker.click();
-  });
+  /* ---------- import from USB ---------- */
+  qs("loadFromUSB").onclick = () => qs("filePicker").click();
 
-  filePicker.addEventListener("change", (event) => {
-    const file = event.target.files[0];
+  qs("filePicker").onchange = (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
     const reader = new FileReader();
-
-    reader.onload = function (e) {
-      const text = e.target.result;
+    reader.onload = (e) => {
       const entries = [];
-      const lines = text.split('\n').map(line => line.trim());
-      let currentEntry = {};
-
-      for (const line of lines) {
-        if (line.startsWith("Website:")) {
-          currentEntry.site = line.substring("Website:".length).trim();
-        } else if (line.startsWith("Username:")) {
-          currentEntry.username = line.substring("Username:".length).trim();
-        } else if (line.startsWith("Password:")) {
-          currentEntry.password = line.substring("Password:".length).trim();
-          if (currentEntry.site && currentEntry.username && currentEntry.password) {
-            entries.push(currentEntry);
-            currentEntry = {}; // Reset for the next entry
+      let current = {};
+      e.target.result
+        .split("\n")
+        .map((l) => l.trim())
+        .forEach((line) => {
+          if (line.startsWith("Website:")) {
+            current.site = line.slice(8).trim();
+          } else if (line.startsWith("Username:")) {
+            current.username = line.slice(9).trim();
+          } else if (line.startsWith("Password:")) {
+            current.password = line.slice(9).trim();
+            if (current.site && current.username && current.password) {
+              entries.push(current);
+              current = {};
+            }
           }
-        }
-      }
-
-      if (entries.length > 0) {
-        chrome.runtime.sendMessage({ action: "importFromUSB", data: entries }, (response) => {
-          alert(`Successfully loaded ${entries.length} passwords from USB.`);
         });
-      } else {
-        alert("No password entries found in the file.");
-      }
+      if (!entries.length) return alert("No entries found in file.");
+      chrome.runtime.sendMessage(
+        { action: "importFromUSB", data: entries },
+        (resp) =>
+          alert(
+            resp?.status === "imported"
+              ? `Imported ${resp.count} passwords.`
+              : `Error: ${resp?.message || "unknown"}`
+          )
+      );
     };
-
     reader.readAsText(file);
-  });
+  };
 
-  saveUSBBtn.addEventListener("click", () => {
+  /* ---------- export to USB ---------- */
+  qs("saveToUSB").onclick = () =>
     chrome.runtime.sendMessage({ action: "exportToUSB" });
-  });
 });
