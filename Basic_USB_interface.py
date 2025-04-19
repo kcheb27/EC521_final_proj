@@ -72,6 +72,27 @@ def add_credentials(usb_path, url, username, password):
     conn.commit()
     conn.close()
 
+def show_credentials(usb_path):
+    """Print all rows in the credentials table."""
+    db_path = os.path.join(usb_path, 'passwords.db')
+    if not os.path.exists(db_path):
+        print("passwords.db not found.")
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT url, username, password FROM credentials")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if rows:
+        print("\nStored credentials:")
+        print("-" * 50)
+        for i, (url, user, pwd) in enumerate(rows, 1):
+            print(f"{i}. URL: {url}\n   Username: {user}\n   Password: {pwd}\n")
+    else:
+        print("No credentials stored.")
+
 def encrypt_file(file_path, key):
     """Encrypt the database file using AES‑256‑CBC with PKCS7 padding.
 
@@ -118,7 +139,8 @@ def main():
     print("1. Setup")
     print("2. Run")
     print("3. Add credentials (test)")
-    user_choice = input("Enter 1, 2 or 3: ").strip()
+    print("4. View credentials")
+    user_choice = input("Enter 1, 2, 3 or 4: ").strip()
 
     if user_choice == '1':
         # Setup: Check for USB drive and create the passwords.db file
@@ -179,6 +201,32 @@ def main():
                     print("Database re‑encrypted. Test complete.")
                 except Exception as e:
                     print(f"Decryption failed: {e}")
+    
+    elif user_choice == '4':
+        # View credentials
+        usb_path = find_usb_drive()
+        if usb_path:
+            file_path = os.path.join(usb_path, 'passwords.db')
+            if not os.path.exists(file_path):
+                print("passwords.db does not exist on the USB drive. Please run Setup first.")
+            else:
+                key_hex = getpass.getpass("Enter the 64‑hex‑character AES key: ").strip()
+                try:
+                    key_input = bytes.fromhex(key_hex)
+                    if len(key_input) != 32:
+                        raise ValueError
+                except ValueError:
+                    print("Invalid key format.")
+                    return
+
+                try:
+                    decrypt_file(file_path, key_input)
+                    print("Database decrypted.\n")
+                    show_credentials(usb_path)
+                    encrypt_file(file_path, key_input)
+                    print("Database re‑encrypted.")
+                except Exception as e:
+                    print(f"Decryption failed: {e}")
         else:
             print("No USB drive found")
     
@@ -213,7 +261,7 @@ def main():
             print("No USB drive found")
     
     else:
-        print("Invalid choice. Please select 1, 2 or 3.")
+        print("Invalid choice. Please select 1, 2, 3 or 4.")
 
 if __name__ == '__main__':
     main()
