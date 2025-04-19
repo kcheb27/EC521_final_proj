@@ -11,41 +11,47 @@ async function getMasterKey() {
 
 /* ---------- message router ---------- */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  /* wrap each handler in an async IIFE so we can use await */
   switch (request.action) {
-    /* save credentials */
+    /* -------- save / overwrite credentials -------- */
     case "savePassword":
       (async () => {
         try {
           const key = await getMasterKey();
           if (!key) throw new Error("Master key not set.");
-          await fetch(`${API_BASE}/savePassword`, {
+
+          const body = {
+            site: request.site,
+            username: request.username,
+            password: request.password,
+            masterKey: key
+          };
+          if (request.force) body.force = true;      // resend with force flag
+
+          const res  = await fetch(`${API_BASE}/savePassword`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              site: request.site,
-              username: request.username,
-              password: request.password,
-              masterKey: key
-            })
+            body: JSON.stringify(body)
           });
-          sendResponse({ status: "success" });
+          const data = await res.json();             // {status:...}
+          sendResponse(data);                        // pass straight to popup
         } catch (e) {
           sendResponse({ status: "error", message: e.message });
         }
       })();
       return true;
 
-    /* retrieve credentials */
+    /* -------- retrieve credentials -------- */
     case "getPassword":
       (async () => {
         try {
           const key = await getMasterKey();
           if (!key) throw new Error("Master key not set.");
           const r = await fetch(
-            `${API_BASE}/getPassword/${encodeURIComponent(request.site)}?key=${key}`
+            `${API_BASE}/getPassword/${encodeURIComponent(
+              request.site
+            )}?key=${key}`
           );
-          const data = await r.json(); // { entry: {...} | null }
+          const data = await r.json();               // { entry: {...} | null }
           sendResponse(data);
         } catch (e) {
           sendResponse({ entry: null, message: e.message });
@@ -53,7 +59,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })();
       return true;
 
-    /* import list from text file */
+    /* -------- import list from text file -------- */
     case "importFromUSB":
       (async () => {
         try {
@@ -67,7 +73,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               masterKey: key
             })
           });
-          const data = await r.json(); // { status, count }
+          const data = await r.json();               // { status, count }
           sendResponse(data);
         } catch (e) {
           sendResponse({ status: "error", message: e.message });
@@ -75,13 +81,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })();
       return true;
 
-    /* export text file & trigger download */
+    /* -------- export & trigger download -------- */
     case "exportToUSB":
       (async () => {
         try {
           const key = await getMasterKey();
           if (!key) throw new Error("Master key not set.");
-          const r = await fetch(`${API_BASE}/exportToUSB?key=${key}`);
+          const r   = await fetch(`${API_BASE}/exportToUSB?key=${key}`);
           const txt = await r.text();
           const url =
             "data:text/plain;charset=utf-8," + encodeURIComponent(txt);

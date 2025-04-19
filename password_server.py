@@ -131,16 +131,21 @@ def save_password(data: dict):
         exists = cur.fetchone() is not None
 
         if exists and not force:
-            return {"status": "exists"}          # tell frontend “already there”
+            return {"status": "exists"}
 
-        cur.execute(
-            """
-            INSERT OR REPLACE INTO credentials (url, username, password)
-            VALUES (?,?,?)
-            """,
-            (site, username, pw),
-        )
-        return {"status": "overwritten" if exists else "success"}
+        if exists:
+            cur.execute(
+                "UPDATE credentials SET password = ? WHERE url = ? AND username = ?",
+                (pw, site, username),
+            )
+            return {"status": "overwritten"}
+        else:
+            cur.execute(
+                "INSERT INTO credentials (url, username, password) VALUES (?,?,?)",
+                (site, username, pw),
+            )
+            return {"status": "success"}
+
 
     # send the callback's result straight to the client
     return _with_decrypted_db(key, _upsert)
