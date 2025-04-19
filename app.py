@@ -2,9 +2,10 @@ from flask import Flask, request, jsonify
 from flasgger import Swagger
 import os
 import sqlite3
+from functools import wraps
 from Basic_USB_interface import (
     find_usb_drive, create_database, add_credentials, show_credentials,
-    encrypt_file, decrypt_file
+    encrypt_file, decrypt_file, decrypt_payload, derive_aes_key
 )
 
 app = Flask(__name__)
@@ -22,6 +23,7 @@ def get_db_path():
 
 
 def with_decrypted_db(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if not aes_key:
             return jsonify({"error": "AES key not set"}), 401
@@ -78,7 +80,7 @@ def set_key():
 @with_decrypted_db
 def add_password():
     """
-    Add a new password record to the encrypted database.
+    Add a new password (fields encrypted from frontend).
 
     ---
     tags:
@@ -89,44 +91,43 @@ def add_password():
         application/json:
           schema:
             type: object
-            required:
-              - url
-              - username
-              - password
+            required: [iv, ciphertext, password]
             properties:
-              url:
+              iv:
                 type: string
-              username:
+              ciphertext:
                 type: string
               password:
-                type: string
+                type: string  # 主密码，用于派生通信 AES key（仅用于 API 解密）
     responses:
       200:
-        description: Password added successfully
-      400:
-        description: Missing required fields
-      500:
-        description: Internal error
+        description: Added
     """
     data = request.json
-    url = data.get("url")
-    username = data.get("username")
-    password = data.get("password")
-    if not all([url, username, password]):
-        return jsonify({"error": "Missing field"}), 400
+    password_for_decryption = data.get("password")
+    if not password_for_decryption:
+        return jsonify({"error": "Missing password"}), 400
     try:
-        usb_path = find_usb_drive()
-        add_credentials(usb_path, url, username, password)
-        return jsonify({"status": "added"}), 200
+        decrypted_payload = decrypt_payload(data, password_for_decryption)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Decryption failed: {e}"}), 400
+
+    
+    url = decrypted_payload.get("url")
+    username = decrypted_payload.get("username")
+    password = decrypted_payload.get("password")
+
+    usb_path = find_usb_drive()
+    add_credentials(usb_path, url, username, password)
+    return jsonify({"status": "added"})
 
 
-@app.route("/api/passwords/<site>", methods=["GET"])
+
+@app.route("/api/passwords/<site>", methods=["POST"])
 @with_decrypted_db
 def get_password_by_site(site):
     """
-    Retrieve password record for a specific site.
+    Retrieve password record for a specific site and return AES-encrypted payload.
 
     ---
     tags:
@@ -137,70 +138,86 @@ def get_password_by_site(site):
         required: true
         schema:
           type: string
-        description: Website domain or URL
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password]
+            properties:
+              password:
+                type: string
+                description: The master password for response encryption
     responses:
       200:
-        description: Password entry found
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                password:
-                  type: string
-      404:
-        description: No password entry for site
+        description: Encrypted password entry
     """
+    from Basic_USB_interface import encrypt_response
+
+    req = request.json
+    password_for_encrypt = req.get("password")
+    if not password_for_encrypt:
+        return jsonify({"error": "Missing password"}), 400
+
     db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT username, password FROM credentials WHERE url = ?", (site,))
     row = cursor.fetchone()
     conn.close()
+
     if row:
-        return jsonify({"username": row[0], "password": row[1]})
+        data = {"username": row[0], "password": row[1]}
+        return jsonify(encrypt_response(data, password_for_encrypt))
     else:
         return jsonify({"error": "Not found"}), 404
 
 
-@app.route("/api/passwords", methods=["GET"])
+@app.route("/api/passwords/all", methods=["POST"])
 @with_decrypted_db
 def get_all_passwords():
     """
-    Retrieve all stored credentials in decrypted form.
+    Retrieve all stored credentials and return encrypted payload.
 
     ---
     tags:
       - Password Storage
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password]
+            properties:
+              password:
+                type: string
+                description: The master password for response encryption
     responses:
       200:
-        description: List of all credentials
-        content:
-          application/json:
-            schema:
-              type: array
-              items:
-                type: object
-                properties:
-                  url:
-                    type: string
-                  username:
-                    type: string
-                  password:
-                    type: string
+        description: Encrypted list of credentials
     """
+    
+    from Basic_USB_interface import encrypt_response
+
+    req = request.json
+    password_for_encrypt = req.get("password")
+    if not password_for_encrypt:
+        return jsonify({"error": "Missing password"}), 400
+
     db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT url, username, password FROM credentials")
     rows = cursor.fetchall()
     conn.close()
-    return jsonify([
+
+    data = [
         {"url": row[0], "username": row[1], "password": row[2]}
         for row in rows
-    ])
+    ]
+    return jsonify(encrypt_response(data, password_for_encrypt))
 
 
 @app.route("/api/reset", methods=["POST"])

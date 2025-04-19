@@ -6,7 +6,11 @@ from cryptography.hazmat.backends import default_backend
 import sqlite3
 import getpass
 from hashlib import pbkdf2_hmac
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
 import base64
+import json
 
 def find_usb_drive():
     """Return the mount point of the first removable USB drive.
@@ -268,20 +272,43 @@ def main():
     
 
 
-def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -> str:
-    """
-    Derive an AES key from a password for communication between frontend and backend
-    This makes the same password always generate the same key.
-    """
-    salt = b''  # No salt
-    key = pbkdf2_hmac(
-        hash_name='sha256',
-        password=password.encode(),
-        salt=salt,
-        iterations=iterations,
-        dklen=length
-    )
-    return base64.urlsafe_b64encode(key).decode()
+def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -> bytes:
+    return pbkdf2_hmac('sha256', password.encode(), b'', iterations, dklen=length)
+
+def decrypt_payload(payload: dict, password: str) -> dict:
+    iv = base64.b64decode(payload["iv"])
+    ciphertext = base64.b64decode(payload["ciphertext"])
+    key = derive_aes_key(password)
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    padded_data = decryptor.update(ciphertext) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    plaintext = unpadder.update(padded_data) + unpadder.finalize()
+
+    return json.loads(plaintext.decode())
+
+def encrypt_response(data: dict, password: str) -> dict:
+    """Encrypt response data (dict) using AES-CBC derived from password (PBKDF2, no salt)."""
+    from Basic_USB_interface import derive_aes_key  # 确保你的函数导出了
+
+    key = derive_aes_key(password)
+    iv = os.urandom(16)
+
+    # Convert dict to padded JSON bytes
+    plaintext = json.dumps(data).encode()
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(plaintext) + padder.finalize()
+
+    # AES-CBC encryption
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(padded) + encryptor.finalize()
+
+    return {
+        "iv": base64.b64encode(iv).decode(),
+        "ciphertext": base64.b64encode(ciphertext).decode()
+    }
 
 if __name__ == '__main__':
     main()
