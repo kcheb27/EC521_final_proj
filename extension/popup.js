@@ -1,77 +1,114 @@
+/* popup.js – UI logic for UPass popup */
+
 document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
 
-  /* ---------- master‑key handling ---------- */
+  /* ─────────── master‑key handling ─────────── */
   chrome.storage.local.get("masterKey", ({ masterKey }) => {
     if (masterKey) qs("masterKey").value = masterKey;
   });
 
   qs("setKey").onclick = () => {
     const key = qs("masterKey").value.trim();
-    if (key.length !== 64 || !/^[0-9a-fA-F]+$/.test(key)) {
-      return alert("Key must be 64 hexadecimal characters.");
+    if (key.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(key)) {
+      return alert("Key must be exactly 64 hexadecimal characters.");
     }
     chrome.storage.local.set({ masterKey: key }, () => alert("Key saved."));
   };
 
-  /* ---------- save credentials ---------- */
+  /* ─────────── save credentials ─────────── */
   qs("save").onclick = () => {
-    chrome.runtime.sendMessage(
-      {
-        action: "savePassword",
-        site: qs("site").value.trim(),
-        username: qs("username").value,
-        password: qs("password").value
-      },
-      (r) => {
-        if (r?.status === "success") alert("Password saved!");
-        else alert(`Error: ${r?.message || "unknown"}`);
+    const payload = {
+      action: "savePassword",
+      site: qs("site").value.trim(),
+      username: qs("username").value,
+      password: qs("password").value
+    };
+    if (!payload.site || !payload.username || !payload.password) {
+      return alert("Site, username, and password are required.");
+    }
+
+    chrome.runtime.sendMessage(payload, handleSaveResponse);
+
+    function handleSaveResponse(resp) {
+      if (!resp) return alert("No response from background.");
+
+      switch (resp.status) {
+        case "success":
+          alert("Password saved!");
+          break;
+
+        case "overwritten":
+          alert("Existing password overwritten.");
+          break;
+
+        case "exists":
+          if (
+            confirm(
+              `Credentials already stored for “${payload.site}”.\n` +
+                "Overwrite existing entry?"
+            )
+          ) {
+            chrome.runtime.sendMessage(
+              { ...payload, force: true },
+              (r2) => {
+                if (r2?.status === "overwritten" || r2?.status === "success") {
+                  alert("Password overwritten.");
+                } else {
+                  alert(`Error: ${r2?.message || "unknown"}`);
+                }
+              }
+            );
+          }
+          break;
+
+        default:
+          alert(`Error: ${resp.message || "unknown"}`);
       }
-    );
+    }
   };
 
-  /* ---------- show credentials ---------- */
+  /* ─────────── show credentials ─────────── */
   qs("showPassword").onclick = () => {
     let site = qs("site").value.trim();
 
-    const fillFields = (entry) => {
+    const fill = (entry) => {
       qs("username").value = entry.username;
       qs("password").value = entry.password;
     };
 
-    const fetchSite = (hostname) =>
+    const fetchCred = (host) =>
       chrome.runtime.sendMessage(
-        { action: "getPassword", site: hostname },
-        (resp) => {
-          resp?.entry
-            ? fillFields(resp.entry)
-            : alert(`No password saved for ${hostname}`);
+        { action: "getPassword", site: host },
+        (r) => {
+          r?.entry
+            ? fill(r.entry)
+            : alert(`No password saved for ${host}`);
         }
       );
 
     if (site) {
-      fetchSite(site);
+      fetchCred(site);
     } else {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const url = tabs[0]?.url;
-        if (!url) return;
         try {
-          site = new URL(url).hostname;
+          site = new URL(tabs[0].url).hostname;
           qs("site").value = site;
-          fetchSite(site);
+          fetchCred(site);
         } catch {
-          alert("Unable to extract hostname.");
+          alert("Unable to detect current site.");
         }
       });
     }
   };
 
-  /* ---------- import from USB ---------- */
+  /* ─────────── import from USB (plain‑text dump) ─────────── */
   qs("loadFromUSB").onclick = () => qs("filePicker").click();
 
   qs("filePicker").onchange = (ev) => {
     const file = ev.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const entries = [];
@@ -92,21 +129,25 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         });
-      if (!entries.length) return alert("No entries found in file.");
+
+      if (!entries.length) return alert("No entries found in the file.");
+
       chrome.runtime.sendMessage(
         { action: "importFromUSB", data: entries },
-        (resp) =>
-          alert(
-            resp?.status === "imported"
-              ? `Imported ${resp.count} passwords.`
-              : `Error: ${resp?.message || "unknown"}`
-          )
+        (r) => {
+          if (r?.status === "imported") {
+            alert(`Imported ${r.count} passwords.`);
+          } else {
+            alert(`Error: ${r?.message || "unknown"}`);
+          }
+        }
       );
     };
     reader.readAsText(file);
   };
 
-  /* ---------- export to USB ---------- */
-  qs("saveToUSB").onclick = () =>
-    chrome.runtime.sendMessage({ action: "exportToUSB" });
+  /* ─────────── export to USB ─────────── */
+  qs("saveToUSB")?.addEventListener("click", () =>
+    chrome.runtime.sendMessage({ action: "exportToUSB" })
+  );
 });
