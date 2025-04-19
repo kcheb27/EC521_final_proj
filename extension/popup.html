@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Password Manager</title>
+    <title>UPass – Password Manager</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
@@ -9,12 +9,13 @@
     />
     <style>
       :root {
-        --primary: #4f46e5;
-        --primary-dark: #4338ca;
-        --bg: #f3f4f6;
+        --primary: #1e3a8a;
+        --primary-dark: #1e40af;
+        --accent: #38bdf8;
+        --bg: #f8fafc;
         --surface: #ffffff;
-        --text: #111827;
-        --radius: 10px;
+        --text: #0f172a;
+        --radius: 8px;
       }
       * {
         box-sizing: border-box;
@@ -28,19 +29,30 @@
       }
       .card {
         background: var(--surface);
+        border: 1px solid #e2e8f0;
         border-radius: var(--radius);
         padding: 20px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        width: 280px;
+        gap: 16px;
+        width: 300px;
+      }
+      .logo {
+        font-size: 28px;
+        font-weight: 600;
+        color: var(--primary);
+        letter-spacing: -0.5px;
+        align-self: center;
+        user-select: none;
+        margin-bottom: 4px;
       }
       input[type="text"],
       input[type="password"] {
         padding: 10px 12px;
         border: 1px solid #d1d5db;
         border-radius: var(--radius);
+        background: #f1f5f9;
         outline: none;
         transition: border 0.2s;
       }
@@ -64,20 +76,43 @@
       button:active {
         transform: translateY(1px);
       }
-      /* color variations */
-      #showPassword { background: #10b981; }
-      #showPassword:hover { background: #059669; }
-      #loadFromUSB { background: #f59e0b; }
-      #loadFromUSB:hover { background: #d97706; }
-      #saveToUSB { background: #ef4444; }
-      #saveToUSB:hover { background: #dc2626; }
-
-      #filePicker { display: none; }
+      /* colour variations */
+      #showPassword {
+        background: var(--accent);
+      }
+      #showPassword:hover {
+        background: #0ea5e9;
+      }
+      #loadFromUSB {
+        background: #f59e0b;
+      }
+      #loadFromUSB:hover {
+        background: #d97706;
+      }
+      #saveToUSB {
+        background: #ef4444;
+      }
+      #saveToUSB:hover {
+        background: #dc2626;
+      }
+      /* visually separate sections */
+      hr {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 4px 0;
+      }
+      #filePicker {
+        display: none;
+      }
     </style>
     <script src="popup.js"></script>
   </head>
+
   <body>
     <div class="card">
+      <div class="logo">UPass</div>
+
+      <!-- credentials -->
       <input type="text" id="site" placeholder="Website" />
       <input type="text" id="username" placeholder="Username" />
       <input type="password" id="password" placeholder="Password" />
@@ -86,6 +121,7 @@
 
       <hr />
 
+      <!-- master‑key controls -->
       <input
         type="text"
         id="masterKey"
@@ -95,10 +131,6 @@
       <button id="setKey">Set Master Key</button>
 
       <hr />
-
-      <button id="loadFromUSB">Load from USB</button>
-      <button id="saveToUSB">Save to USB</button>
-      <input type="file" id="filePicker" />
     </div>
   </body>
 </html>
