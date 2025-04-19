@@ -14,22 +14,38 @@ def find_usb_drive():
     return None
 
 def create_password_file(usb_path):
-    """Create a passwords.txt file on the USB drive and write data."""
+    """Ensure a passwords.txt file exists on the USB drive.
+
+    The function simply creates an empty file if one is not already present.
+    """
     file_path = os.path.join(usb_path, 'passwords.txt')
 
-    # Check if the file already exists
-    if os.path.exists(file_path):
-        print("The 'passwords.txt' file already exists.")
-    else:
-        # Create and write data to the file
+    # If the file doesn't exist, create it
+    if not os.path.exists(file_path):
         try:
-            with open(file_path, 'w') as file:
-                file.write("Username1 : Password1\n")
-                file.write("Username2 : Password2\n")
-                file.write("Username3 : Password3\n")
-            print(f"File created at: {file_path}")
+            # Create an empty file
+            with open(file_path, 'w'):
+                pass
+            print(f"'passwords.txt' created at: {file_path}")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"An error occurred while creating passwords.txt: {e}")
+    else:
+        print("'passwords.txt' already exists.")
+
+def add_credentials(usb_path, username, password):
+    """Append a username/password pair to passwords.txt on the USB drive.
+
+    The entry is written as: <username> : <password>
+    """
+    file_path = os.path.join(usb_path, 'passwords.txt')
+
+    # Make sure the file exists
+    if not os.path.exists(file_path):
+        create_password_file(usb_path)
+
+    # Append the new credentials
+    with open(file_path, 'a') as file:
+        file.write(f"{username} : {password}\n")
 
 def encrypt_file(file_path, key):
     """Encrypt the passwords.txt file using Fernet symmetric encryption."""
