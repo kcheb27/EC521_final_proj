@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
         break;
   
       case "error":
-        alert("🔔 " + resp.message);
+        alert(resp.message);
         window.close();
         break;
   
