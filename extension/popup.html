@@ -3,15 +3,15 @@
   <head>
     <title>UPass – Password Manager</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
       :root {
         --primary: #1e3a8a;
         --primary-dark: #1e40af;
         --accent: #38bdf8;
+        --accent-dark: #0ea5e9;
+        --danger: #ef4444;
+        --danger-dark: #dc2626;
         --bg: #f8fafc;
         --surface: #ffffff;
         --text: #0f172a;
@@ -45,7 +45,6 @@
         letter-spacing: -0.5px;
         align-self: center;
         user-select: none;
-        margin-bottom: 4px;
       }
       input[type="text"],
       input[type="password"] {
@@ -70,51 +69,37 @@
         cursor: pointer;
         transition: background 0.2s, transform 0.1s;
       }
-      button:hover {
-        background: var(--primary-dark);
-      }
-      button:active {
-        transform: translateY(1px);
-      }
+      button:hover { background: var(--primary-dark); }
+      button:active { transform: translateY(1px); }
+
       /* colour variations */
-      #showPassword {
-        background: var(--accent);
+      #showPassword { background: var(--accent); }
+      #showPassword:hover { background: var(--accent-dark); }
+      #clearMasterKey { background: var(--danger); }
+      #clearMasterKey:hover { background: var(--danger-dark); }
+
+      #generate { background: var(--accent); }
+      #generate:hover { background: var(--accent-dark); }
+
+      hr { border: none; border-top: 1px solid #e2e8f0; margin: 4px 0; }
+
+      /* inline helpers */
+      .password-row { display: flex; gap: 6px; align-items: center; }
+      .password-row input { flex: 1 1 0; }
+      .mini-btn {
+        padding: 6px 10px;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        color: #1e293b;
       }
-      #showPassword:hover {
-        background: #0ea5e9;
-      }
-      #loadFromUSB {
-        background: #f59e0b;
-      }
-      #loadFromUSB:hover {
-        background: #d97706;
-      }
-      #saveToUSB {
-        background: #ef4444;
-      }
-      #saveToUSB:hover {
-        background: #dc2626;
-      }
-      /* new – clear master‑key */
-      #clearMasterKey {
-        background: #ef4444;
-      }
-      #clearMasterKey:hover {
-        background: #dc2626;
-      }
-      /* visually separate sections */
-      hr {
-        border: none;
-        border-top: 1px solid #e2e8f0;
-        margin: 4px 0;
-      }
-      #filePicker {
-        display: none;
-      }
+      .mini-btn:hover { background: #e2e8f0; }
+      #filePicker { display: none; }
     </style>
     <script src="popup.js"></script>
   </head>
-
   <body>
     <div class="card">
       <div class="logo">PocketVault</div>
@@ -122,34 +107,14 @@
       <!-- credentials -->
       <input type="text" id="site" placeholder="Website" />
       <input type="text" id="username" placeholder="Username" />
-      <!-- <input type="password" id="password" placeholder="Password" /> -->
-      <div style="position: relative;">
-        <input
-          type="password"
-          id="password"
-          placeholder="Password"
-          style="width: 100%; padding-right: 40px;"
-        />
-        <button
-          id="togglePassword"
-          style="
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 2px 6px;
-            font-size: 14px;
-            cursor: pointer;
-            color: #1e293b;
-          "
-          title="Show/Hide"
-        >
-          Show
-        </button>
+
+      <div class="password-row">
+        <input type="password" id="password" placeholder="Password" />
+        <button id="togglePassword" class="mini-btn" title="Show/Hide">Show</button>
       </div>
+
+      <!-- full‑width generate button -->
+      <button id="generate" title="Generate secure password">Generate Password</button>
 
       <button id="save">Save</button>
       <button id="showPassword">Show Password</button>
@@ -157,33 +122,9 @@
       <hr />
 
       <!-- master‑key controls -->
-      <div style="position: relative;">
-        <input
-          type="password"
-          id="masterKey"
-          placeholder="Enter your passphrase"
-          autocomplete="off"
-          style="width: 100%; padding-right: 40px;"
-        />
-        <button
-          id="toggleMasterKey"
-          style="
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #f1f5f9;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 2px 6px;
-            font-size: 14px;
-            cursor: pointer;
-            color: #1e293b;
-          "
-          title="Show/Hide"
-        >
-          Show
-        </button>
+      <div class="password-row">
+        <input type="password" id="masterKey" placeholder="Enter your passphrase" autocomplete="off" />
+        <button id="toggleMasterKey" class="mini-btn" title="Show/Hide">Show</button>
       </div>
 
       <button id="setKey">Set Master Key</button>

@@ -1,154 +1,133 @@
-/* popup.js – UI logic for UPass popup */
+// popup.js – UI logic for UPass popup (refactored layout)
+
+/**
+ * Create a cryptographically–secure random password.
+ * @param {number} len Desired length (default 16)
+ * @returns {string}
+ */
+function generateSecurePassword(len = 16) {
+  const charset =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}<>?";
+  const bytes = new Uint32Array(len);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (v) => charset[v % charset.length]).join("");
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
 
-  const masterKeyInput = document.getElementById("masterKey");
-  const toggleMasterKeyButton = document.getElementById("toggleMasterKey");
+  /* ---------------- toggle master‑key visibility ---------------- */
+  const masterKeyInput = qs("masterKey");
+  const toggleMasterKeyButton = qs("toggleMasterKey");
 
-  toggleMasterKeyButton.addEventListener("click", () => {
-    if (masterKeyInput.type === "password") {
-      masterKeyInput.type = "text";
-      toggleMasterKeyButton.textContent = "Hide";
-    } else {
-      masterKeyInput.type = "password";
-      toggleMasterKeyButton.textContent = "Show";
-    }
+  toggleMasterKeyButton?.addEventListener("click", () => {
+    const isHidden = masterKeyInput.type === "password";
+    masterKeyInput.type = isHidden ? "text" : "password";
+    toggleMasterKeyButton.textContent = isHidden ? "Hide" : "Show";
   });
 
+  /* ---------------- toggle password visibility ---------------- */
+  const passwordInput = qs("password");
+  const togglePasswordButton = qs("togglePassword");
 
-  const passwordInput = document.getElementById("password");
-  const togglePasswordButton = document.getElementById("togglePassword");
-
-  togglePasswordButton.addEventListener("click", () => {
-    if (passwordInput.type === "password") {
-      passwordInput.type = "text";
-      togglePasswordButton.textContent = "Hide";
-    } else {
-      passwordInput.type = "password";
-      togglePasswordButton.textContent = "Show";
-    }
+  togglePasswordButton?.addEventListener("click", () => {
+    const isHidden = passwordInput.type === "password";
+    passwordInput.type = isHidden ? "text" : "password";
+    togglePasswordButton.textContent = isHidden ? "Hide" : "Show";
   });
 
-  /* ----------- master‑key handling ----------- */
+  /* ---------------- secure‑password generator ---------------- */
+  const genBtn = qs("generate");
+  if (genBtn) {
+    genBtn.addEventListener("click", async () => {
+      const pw = generateSecurePassword();
+      passwordInput.value = pw;         // fill main password field
+      try {
+        await navigator.clipboard.writeText(pw);
+        genBtn.textContent = "Copied!";
+        setTimeout(() => (genBtn.textContent = "Generate"), 1500);
+      } catch {
+        alert("Generated and filled password (copy failed – clipboard permissions?)");
+      }
+    });
+  }
+
+  /* ---------------- load saved master key ---------------- */
   chrome.storage.local.get("masterKey", ({ masterKey }) => {
-    if (masterKey) qs("masterKey").value = masterKey;
+    if (masterKey) masterKeyInput.value = masterKey;
   });
 
+  /* ---------------- set master key ---------------- */
   qs("setKey").onclick = () => {
-    const key = qs("masterKey").value.trim();
-    if (key.length < 6 ) {
-      return alert("Key must be longer than 6 characters.");
-    }
+    const key = masterKeyInput.value.trim();
+    if (key.length < 6) return alert("Key must be at least 6 characters.");
+
     chrome.storage.local.set({ masterKey: key }, () => alert("Key saved."));
 
     chrome.runtime.sendMessage({ action: "checkAndInitUSB" }, (resp) => {
       if (!resp) return;
-    
+      const msg = resp.message || "";
       switch (resp.status) {
         case "usbMissing":
-          console.log("usb missing");
-          alert(resp.message);
-          window.close();
-          break;
-    
         case "missingKey":
-          console.log("masterkey missing");
-          alert("Please set a password first. Then re-open extension window to finish initialization.")
-          break;
-    
         case "created":
-          console.log("Database created and encrypted.");
-          alert("Database created and encrypted.")
-          break;
-    
         case "encrypted":
-          console.log("Existing database. Encrypted.");
-          alert("Existing database. Encrypted.")
-          break;
-    
         case "error":
-          alert(resp.message);
-          window.close();
-          break;
-    
-        case "ok":
-          console.log("usb db setup already done. check and init usb OK.");
+          alert(msg);
+          if (["usbMissing", "error"].includes(resp.status)) window.close();
           break;
       }
     });
   };
 
-  /* ----------- save credentials ----------- */
+  /* ---------------- save credentials ---------------- */
   qs("save").onclick = () => {
     const payload = {
       action: "savePassword",
       site: qs("site").value.trim(),
       username: qs("username").value,
-      password: qs("password").value
+      password: passwordInput.value
     };
     if (!payload.site || !payload.username || !payload.password) {
       return alert("Site, username, and password are required.");
     }
 
-    chrome.runtime.sendMessage(payload, handleSaveResponse);
-
-    function handleSaveResponse(resp) {
+    chrome.runtime.sendMessage(payload, (resp) => {
       if (!resp) return alert("No response from background.");
 
       switch (resp.status) {
         case "success":
           alert("Password saved!");
           break;
-
         case "overwritten":
           alert("Existing password overwritten.");
           break;
-
-        case "exists":
-          if (
-            confirm(
-              `Credentials already stored for “${payload.site}”.\n` +
-                "Overwrite existing entry?"
-            )
-          ) {
-            chrome.runtime.sendMessage(
-              { ...payload, force: true },
-              (r2) => {
-                if (r2?.status === "overwritten" || r2?.status === "success") {
-                  alert("Password overwritten.");
-                } else {
-                  alert(`Error: ${r2?.message || "unknown"}`);
-                }
-              }
-            );
-          }
+        case "exists": {
+          const ok = confirm(
+            `Credentials already stored for “${payload.site}”.\nOverwrite existing entry?`
+          );
+          if (ok) chrome.runtime.sendMessage({ ...payload, force: true });
           break;
-
+        }
         default:
           alert(`Error: ${resp.message || "unknown"}`);
       }
-    }
+    });
   };
 
-  /* ----------- show credentials ----------- */
+  /* ---------------- show credentials ---------------- */
   qs("showPassword").onclick = () => {
     let site = qs("site").value.trim();
 
     const fill = (entry) => {
       qs("username").value = entry.username;
-      qs("password").value = entry.password;
+      passwordInput.value = entry.password;
     };
 
     const fetchCred = (host) =>
-      chrome.runtime.sendMessage(
-        { action: "getPassword", site: host },
-        (r) => {
-          r?.entry
-            ? fill(r.entry)
-            : alert(`No password saved for ${host}`);
-        }
-      );
+      chrome.runtime.sendMessage({ action: "getPassword", site: host }, (r) => {
+        r?.entry ? fill(r.entry) : alert(`No password saved for ${host}`);
+      });
 
     if (site) {
       fetchCred(site);
@@ -165,19 +144,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  const btn = document.getElementById("clearMasterKey");
-  if (!btn) return;
-
-  btn.addEventListener("click", async () => {
+  /* ---------------- clear master key ---------------- */
+  qs("clearMasterKey")?.addEventListener("click", async () => {
     try {
-      // Remove only the master key
       await chrome.storage.local.remove("masterKey");
       alert("Master key cleared.");
-      // If your UI shows “logged‑in” state, reset it here…
     } catch (err) {
-      console.error("Failed to clear master key:", err);
+      console.error(err);
       alert("Error clearing master key – see console for details.");
     }
   });
-
 });
