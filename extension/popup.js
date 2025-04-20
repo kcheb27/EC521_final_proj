@@ -169,62 +169,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  /* ----------- import from USB (plain‑text dump) ----------- */
+  const btn = document.getElementById("clearMasterKey");
+  if (!btn) return;
 
-  // const loadBtn = document.getElementById("loadFromUSB");
-  // const fileInput = document.getElementById("filePicker");
+  btn.addEventListener("click", async () => {
+    try {
+      // Remove only the master key
+      await chrome.storage.local.remove("masterKey");
+      alert("Master key cleared.");
+      // If your UI shows “logged‑in” state, reset it here…
+    } catch (err) {
+      console.error("Failed to clear master key:", err);
+      alert("Error clearing master key – see console for details.");
+    }
+  });
 
-  // if (loadBtn && fileInput) {
-  //   loadBtn.onclick = () => fileInput.click();
-  // } else {
-  //   console.warn("Missing DOM elements: loadFromUSB or filePicker");
-  // }
-  // qs("loadFromUSB").onclick = () => qs("filePicker").click();
-
-  // qs("filePicker").onchange = (ev) => {
-  //   const file = ev.target.files[0];
-  //   if (!file) return;
-
-  //   const reader = new FileReader();
-  //   reader.onload = (e) => {
-  //     const entries = [];
-  //     let current = {};
-  //     e.target.result
-  //       .split("\n")
-  //       .map((l) => l.trim())
-  //       .forEach((line) => {
-  //         if (line.startsWith("Website:")) {
-  //           current.site = line.slice(8).trim();
-  //         } else if (line.startsWith("Username:")) {
-  //           current.username = line.slice(9).trim();
-  //         } else if (line.startsWith("Password:")) {
-  //           current.password = line.slice(9).trim();
-  //           if (current.site && current.username && current.password) {
-  //             entries.push(current);
-  //             current = {};
-  //           }
-  //         }
-  //       });
-
-  //     if (!entries.length) return alert("No entries found in the file.");
-
-  //     chrome.runtime.sendMessage(
-  //       { action: "importFromUSB", data: entries },
-  //       (r) => {
-  //         if (r?.status === "imported") {
-  //           alert(`Imported ${r.count} passwords.`);
-  //         } else {
-  //           alert(`Error: ${r?.message || "unknown"}`);
-  //         }
-  //       }
-  //     );
-  //   };
-  //   reader.readAsText(file);
-  // };
-
-
-  /* ----------- export to USB ----------- */
-  qs("saveToUSB")?.addEventListener("click", () =>
-    chrome.runtime.sendMessage({ action: "exportToUSB" })
-  );
 });
