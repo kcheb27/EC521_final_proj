@@ -1,4 +1,4 @@
-# UPass – USB‑Encrypted Password Manager
+# PocketVault – USB‑Encrypted Password Manager
 
 A Chrome extension that securely stores website credentials in an **AES‑256‑encrypted SQLite database** located on a **USB flash drive**, powered by a **FastAPI** backend.
 
@@ -95,9 +95,6 @@ This launches the API at `http://127.0.0.1:5000`
 
 ---
 
-## 🏷️ Project Name
-
-**UPass** – short for **USB Password Manager**
 
 ---
 
