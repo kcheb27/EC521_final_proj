@@ -325,7 +325,8 @@ def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -
         iterations=iterations,
         dklen=length
     )
-    return base64.urlsafe_b64encode(key).decode()
+    # return base64.urlsafe_b64encode(key).decode()
+    return key.hex()
 
 if __name__ == '__main__':
     main()

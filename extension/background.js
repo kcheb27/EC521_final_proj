@@ -115,7 +115,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       })();
       return true;
 
-    /* --------  -------- */
+    /* -------- checkAndInitUSB -------- */
     case "checkAndInitUSB":
       (async () => {
         try {

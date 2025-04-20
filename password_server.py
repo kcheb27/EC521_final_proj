@@ -260,7 +260,7 @@ def setup_usb(data: dict):
         if len(key) != 32:
             raise ValueError
     except Exception:
-        raise HTTPException(400, "masterKey must be 64 hexadecimal characters")
+        raise HTTPException(400, "masterKey must be 64 hexadecimal characters(derive AES key error)")
 
     usb_path = find_usb_drive()
     if not usb_path:

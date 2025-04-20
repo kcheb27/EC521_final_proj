@@ -4,12 +4,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
 
   /* ---------On start, check for usb device--------- */
+
   chrome.runtime.sendMessage({ action: "checkAndInitUSB" }, (resp) => {
     if (!resp) return;
   
     switch (resp.status) {
       case "usbMissing":
         console.log("usb missing");
+        alert(resp.message);
+        window.close();
         break;
   
       case "missingKey":
