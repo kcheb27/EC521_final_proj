@@ -104,6 +104,31 @@
       #filePicker {
         display: none;
       }
+      /* --- password field with eye icon --- */
+.password-wrapper{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.password-wrapper input{
+  width:100%;
+  padding-right:40px;          /* space for the eye */
+}
+.toggle-visibility{
+  position:absolute;
+  right:10px;
+  background:none;
+  border:none;
+  cursor:pointer;
+  line-height:0;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  opacity:.65;
+  transition:opacity .15s;
+}
+.toggle-visibility:hover{ opacity:1; }
     </style>
     <script src="popup.js"></script>
   </head>
@@ -115,7 +140,21 @@
       <!-- credentials -->
       <input type="text" id="site" placeholder="Website" />
       <input type="text" id="username" placeholder="Username" />
-      <input type="password" id="password" placeholder="Password" />
+      <div class="password-wrapper">
+        <input type="password" id="password" placeholder="Password" />
+        <button id="togglePwd"
+                class="toggle-visibility"
+                type="button"
+                aria-label="Show / hide password">
+          <!-- simple eye icon -->
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round"
+               stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
       <button id="save">Save</button>
       <button id="showPassword">Show Password</button>
 

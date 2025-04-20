@@ -201,3 +201,24 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.runtime.sendMessage({ action: "exportToUSB" })
   );
 });
+// -------------------------------------------------------------
+// Toggle password visibility with the eye icon (CSP‑safe)
+// -------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  const pwdInput = document.getElementById('password');
+  const eyeBtn   = document.getElementById('togglePwd');
+  if (!pwdInput || !eyeBtn) return;
+
+  let revealed = false;
+
+  eyeBtn.addEventListener('click', () => {
+    revealed = !revealed;
+    pwdInput.type = revealed ? 'text' : 'password';
+  });
+
+  // Optional: reveal only while hovering
+  eyeBtn.addEventListener('mouseenter', () => (pwdInput.type = 'text'));
+  eyeBtn.addEventListener('mouseleave', () => {
+    if (!revealed) pwdInput.type = 'password';
+  });
+});
