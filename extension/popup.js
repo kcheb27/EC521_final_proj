@@ -148,10 +148,15 @@ document.addEventListener("DOMContentLoaded", () => {
       chrome.runtime.sendMessage(
         { action: "getPassword", site: host },
         (r) => {
-          r?.entry
-            ? fill(r.entry)
-            : alert(`No password saved for ${host}`);
+          if (r?.entry) {
+            fill(r.entry);
+          } else if (r?.message) {
+            alert(`${r.message}`);
+          } else {
+            alert(`No password saved for ${host}`);
+          }
         }
+
       );
 
     if (site) {

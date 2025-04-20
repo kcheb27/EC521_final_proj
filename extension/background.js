@@ -42,22 +42,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     /* -------- retrieve credentials -------- */
     case "getPassword":
-      (async () => {
-        try {
-          const key = await getMasterKey();
-          if (!key) throw new Error("Master key not set.");
-          const r = await fetch(
-            `${API_BASE}/getPassword/${encodeURIComponent(
-              request.site
-            )}?key=${key}`
-          );
-          const data = await r.json();               // { entry: {...} | null }
-          sendResponse(data);
-        } catch (e) {
-          sendResponse({ entry: null, message: e.message });
-        }
-      })();
-      return true;
+  (async () => {
+    try {
+      const key = await getMasterKey();
+      if (!key) throw new Error("Master key not set.");
+
+      const r = await fetch(
+        `${API_BASE}/getPassword/${encodeURIComponent(request.site)}?key=${key}`
+      );
+
+      if (r.status === 500) {
+        
+        throw new Error("Incorrect passphrase. Decryption failed.");
+      }
+
+      const data = await r.json();  // { entry: {...} | null }
+      sendResponse(data);
+    } catch (e) {
+      sendResponse({ entry: null, message: e.message });
+    }
+  })();
+  return true;
 
     /* -------- import list from text file -------- */
     case "importFromUSB":
