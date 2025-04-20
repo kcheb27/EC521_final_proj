@@ -3,22 +3,46 @@ FastAPI service ⇆ Chrome extension ⇆ encrypted USB database
 -----------------------------------------------------------
 
 Relies on Basic_USB_interface.py (same folder).
-• Each request supplies a 64‑hex‑character AES‑256 key (masterKey).
-• Workflow per request:
-    1. Decrypt passwords.db on the USB stick
-    2. Copy the clear DB to a CLOSED temp file
-    3. Run the SQL callback on that temp DB
-    4. Copy temp DB back, re‑encrypt, clean up
 
-Endpoints
----------
-POST /savePassword       {"site","username","password","masterKey"}
-GET  /getPassword/{site}?key=MASTERKEY64
-POST /importFromUSB      {"items":[{site,username,password},...],"masterKey":...}
-GET  /exportToUSB?key=MASTERKEY64       → plaintext download
+• Each request supplies a **passphrase** string (not raw key).
+• Server uses `derive_aes_key(passphrase)` to deterministically generate AES-256 key.
+• The derived key is then used to encrypt/decrypt passwords.db on the USB stick.
+
+Workflow per request:
+---------------------
+    1. Server receives passphrase (as POST or GET query)
+    2. Derive AES key using PBKDF2-HMAC-SHA256 (with fixed salt)
+    3. Decrypt passwords.db on the USB stick
+    4. Copy the clear DB to a CLOSED temp file
+    5. Run SQL callback on that temp DB
+    6. Copy temp DB back, re-encrypt, clean up
+
+Endpoints (Updated)
+-------------------
+POST /savePassword
+    →  { "site", "username", "password", "passphrase" }
+
+GET  /getPassword/{site}?passphrase=xxx
+    →  Returns matching credentials if any
+
+POST /importFromUSB
+    →  { "items": [...], "passphrase": ... }
+
+GET  /exportToUSB?passphrase=xxx
+    →  Plaintext credentials export
+
+POST /setupUSB
+    →  { "passphrase": ... } — creates and encrypts new DB
+
+POST /encryptUSB
+    →  { "passphrase": ... } — encrypts existing DB (if not encrypted)
+
+GET  /usbStatus
+    →  Returns whether USB is connected, DB exists, and whether it is encrypted
 
 Run:
-  uvicorn password_server:app --host 127.0.0.1 --port 5000 --reload
+----
+    uvicorn password_server:app --host 127.0.0.1 --port 5000 --reload
 """
 import os
 import shutil
