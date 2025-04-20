@@ -4,17 +4,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
 
   const masterKeyInput = document.getElementById("masterKey");
-const toggleMasterKeyButton = document.getElementById("toggleMasterKey");
+  const toggleMasterKeyButton = document.getElementById("toggleMasterKey");
 
-toggleMasterKeyButton.addEventListener("click", () => {
-  if (masterKeyInput.type === "password") {
-    masterKeyInput.type = "text";
-    toggleMasterKeyButton.textContent = "Hide";
-  } else {
-    masterKeyInput.type = "password";
-    toggleMasterKeyButton.textContent = "Show";
-  }
-});
+  toggleMasterKeyButton.addEventListener("click", () => {
+    if (masterKeyInput.type === "password") {
+      masterKeyInput.type = "text";
+      toggleMasterKeyButton.textContent = "Hide";
+    } else {
+      masterKeyInput.type = "password";
+      toggleMasterKeyButton.textContent = "Show";
+    }
+  });
+
+
+  const passwordInput = document.getElementById("password");
+  const togglePasswordButton = document.getElementById("togglePassword");
+
+  togglePasswordButton.addEventListener("click", () => {
+    if (passwordInput.type === "password") {
+      passwordInput.type = "text";
+      togglePasswordButton.textContent = "Hide";
+    } else {
+      passwordInput.type = "password";
+      togglePasswordButton.textContent = "Show";
+    }
+  });
 
   /* ---------On start, check for usb device--------- */
 
