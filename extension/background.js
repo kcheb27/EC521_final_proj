@@ -114,5 +114,77 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       })();
       return true;
+
+    /* --------  -------- */
+    case "checkAndInitUSB":
+      (async () => {
+        try {
+          // Step 1: Get usb status (whether it's plugged in)
+          const statusRes = await fetch(`${API_BASE}/usbStatus`);
+          if (!statusRes.ok) {
+            throw new Error("Unable to connect to backend.");
+          }
+          const status = await statusRes.json();
+
+          // Step 2: If no USB detected
+          if (!status.usbFound) {
+            sendResponse({ status: "usbMissing", message: "USB device not found." });
+            return;
+          }
+
+          // Step 3: Fetch masterkey
+          const { masterKey } = await chrome.storage.local.get("masterKey");
+          if (!masterKey || masterKey.length !== 64) {
+            sendResponse({ status: "missingKey", message: "Please set a 64-character master key first. Then refresh to finish initialization." });
+            return;
+          }
+
+          // Step 4: Setup USB (create db + encrypt)
+          if ((!status.encrypted) && status.dbExists) {
+            const encryptRes = await fetch(`${API_BASE}/encryptUSB`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ masterKey })
+            });
+
+            const r = await encryptRes.json();
+            // console.log("check");
+            if (!encryptRes.ok || r.status !== "success") {
+              throw new Error(r.message || "Failed to encrypt existing DB.");
+            }
+
+            sendResponse({ status: "encrypted", message: "Existing database encrypted." });
+            return;
+          }
+          // Don't change the order of checking if (!status.encrypted && status.dbExists) and if (!status.dbExists).
+          if (!status.dbExists) {
+            const setupRes = await fetch(`${API_BASE}/setupUSB`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ masterKey })
+            });
+
+            const r = await setupRes.json();
+            if (!setupRes.ok || r.status !== "success") {
+              throw new Error(r.message || "Failed to create and encrypt DB.");
+            }
+
+            sendResponse({ status: "created", message: "Database created and encrypted." });
+            return;
+          }
+
+          
+
+          sendResponse({ status: "ok", message: "USB and DB are ready." });
+        } catch (e) {
+          console.error("USB setup err:", e);
+          sendResponse({ status: "error", message: e.message });
+        }
+      })();
+      return true;
+
+
+
+
   }
 });

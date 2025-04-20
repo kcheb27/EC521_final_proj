@@ -41,21 +41,24 @@ from Basic_USB_interface import (
 
 # ---------- USB paths ------------------------------------------------
 USB_PATH = find_usb_drive()
-if not USB_PATH:
-    raise RuntimeError("No USB drive detected – insert one before starting the service.")
+# if not USB_PATH:
+#     raise RuntimeError("No USB drive detected – insert one before starting the service.")
 print(f"USB drive found at: {USB_PATH}")
 
-DB_FILE = os.path.join(USB_PATH, "passwords.db")
+if USB_PATH:
+    DB_FILE = os.path.join(USB_PATH, "passwords.db")
+else:
+    DB_FILE = ""
 
 
 # ---------- helpers --------------------------------------------------
-def _ensure_db() -> None:
-    """Create passwords.db (encrypted) if it doesn’t exist yet."""
-    if not os.path.exists(DB_FILE):
-        create_database(USB_PATH)
-        # leave it UNencrypted for the very first run; caller will encrypt
+# def _ensure_db() -> None:
+#     """Create passwords.db (encrypted) if it doesn’t exist yet."""
+#     if not os.path.exists(DB_FILE):
+#         create_database(USB_PATH)
+#         # leave it UNencrypted for the very first run; caller will encrypt
 
-_ensure_db()
+# _ensure_db()
 
 
 def _with_decrypted_db(hex_key: str, callback):
@@ -207,7 +210,7 @@ def export_to_usb(key: str = Query(..., alias="key")):
     return _with_decrypted_db(key, _dump)
 
 
-@app.get("/usbStatus")  # Check if usb is found, db exists, db is encrypted
+@app.get("/usbStatus") # Check if: usb plugged in, db exists, db encrypted. Update: When calling this function, it detects usb path and db path
 def usb_status():
     usb_path = find_usb_drive()
     if not usb_path:
@@ -216,23 +219,29 @@ def usb_status():
     db_path = os.path.join(usb_path, "passwords.db")
     db_exists = os.path.exists(db_path)
 
-    # check if db's encrypted
     encrypted = False
     if db_exists:
         try:
             with open(db_path, 'rb') as f:
-                first_block = f.read(32)
-            # Check: SQLite DB starts with "SQLite format 3" if it's not encrypted.
-            if not first_block.startswith(b"SQLite format 3"):
+                sig = f.read(16) # if SQLite db is not encrypted it shoud start with:
+            if not sig.startswith(b"SQLite format 3"):
                 encrypted = True
-        except Exception:
+        except:
             encrypted = True
 
+    global USB_PATH 
+    USB_PATH = usb_path
+    global DB_FILE
+    DB_FILE = db_path
+    
     return {
         "usbFound": True,
         "dbExists": db_exists,
-        "encrypted": encrypted
+        "encrypted": encrypted,
+        "usbPath": usb_path,
+        "dbPath": db_path
     }
+
 
 
 @app.post("/setupUSB")
