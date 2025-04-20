@@ -134,27 +134,3 @@
     </div>
   </body>
 </html>
-<script>
-// ---------------------------------------------------------------------------
-// Eye‑icon hover logic to reveal / hide passwords
-// ---------------------------------------------------------------------------
-(function () {
-  const map = [
-    { icon: 'togglePwd', input: 'password' },
-    { icon: 'toggleMaster', input: 'masterKey' }
-  ];
-
-  map.forEach(({ icon, input }) => {
-    const iconEl = document.getElementById(icon);
-    const inputEl = document.getElementById(input);
-    if (!iconEl || !inputEl) return;
-
-    iconEl.addEventListener('mouseenter', () => {
-      inputEl.type = 'text';
-    });
-    iconEl.addEventListener('mouseleave', () => {
-      inputEl.type = 'password';
-    });
-  });
-})();
-</script>
