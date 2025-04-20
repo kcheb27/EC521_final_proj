@@ -132,7 +132,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
           }
 
-          // Step 3: Fetch masterkey
+          // Step 3: Fetch password
           const { masterKey } = await chrome.storage.local.get("masterKey");//actually password
           if (!masterKey || masterKey.length < 6) {
             sendResponse({ status: "missingKey", message: "Please set a password first. Then refresh to finish initialization." });
