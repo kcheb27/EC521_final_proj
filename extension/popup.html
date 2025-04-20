@@ -122,12 +122,23 @@
       <hr />
 
       <!-- master‑key controls -->
-      <input
-        type="password"
-        id="masterKey"
-        placeholder="Enter your passphrase (pwd)"
-        autocomplete="off"
-      />
+      <div style="position: relative;">
+        <input
+          type="password"
+          id="masterKey"
+          placeholder="Enter your passphrase"
+          autocomplete="off"
+          style="width: 100%; padding-right: 40px;"
+        />
+        <button
+          id="toggleMasterKey"
+          style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer;"
+          title="Show/Hide"
+        >
+          👁️
+        </button>
+      </div>
+      
       <button id="setKey">Set Master Key</button>
 
       <hr />

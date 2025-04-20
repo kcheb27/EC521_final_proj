@@ -2,6 +2,19 @@
 
 document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
+  
+  const masterKeyInput = document.getElementById("masterKey");
+const toggleMasterKeyButton = document.getElementById("toggleMasterKey");
+
+toggleMasterKeyButton.addEventListener("click", () => {
+  if (masterKeyInput.type === "password") {
+    masterKeyInput.type = "text";
+    toggleMasterKeyButton.textContent = "🙈";
+  } else {
+    masterKeyInput.type = "password";
+    toggleMasterKeyButton.textContent = "👁️";
+  }
+});
 
   /* ---------On start, check for usb device--------- */
 
