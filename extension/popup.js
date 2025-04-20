@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
       case "missingKey":
         console.log("masterkey missing");
-        alert("Please set a 64-character master key first. Then re-open extension window to finish initialization.")
+        alert("Please set a password first. Then re-open extension window to finish initialization.")
         break;
   
       case "created":
@@ -47,8 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   qs("setKey").onclick = () => {
     const key = qs("masterKey").value.trim();
-    if (key.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(key)) {
-      return alert("Key must be exactly 64 hexadecimal characters.");
+    if (key.length < 6 ) {
+      return alert("Key must be longer than 6 characters.");
     }
     chrome.storage.local.set({ masterKey: key }, () => alert("Key saved."));
   };
