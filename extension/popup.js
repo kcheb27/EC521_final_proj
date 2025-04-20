@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
       case "missingKey":
         console.log("masterkey missing");
-        alert("Please set a password first. Then re-open extension window to finish initialization.")
+        alert("Please set a password first. Then re-open extension to finish initialization.")
         break;
   
       case "created":

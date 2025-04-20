@@ -94,7 +94,9 @@ This launches the API at `http://127.0.0.1:5000`
 - Secure local storage of master key (Chrome local storage)
 
 ---
+## TODOs
 
-
+ - [] Automatically clearing Master key or allow manually clearing it
+ - [] Add Prompt for setup process
 ---
 
