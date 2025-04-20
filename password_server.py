@@ -207,6 +207,98 @@ def export_to_usb(key: str = Query(..., alias="key")):
     return _with_decrypted_db(key, _dump)
 
 
+@app.get("/usbStatus")  # Check if usb is found, db exists, db is encrypted
+def usb_status():
+    usb_path = find_usb_drive()
+    if not usb_path:
+        return {"usbFound": False}
+
+    db_path = os.path.join(usb_path, "passwords.db")
+    db_exists = os.path.exists(db_path)
+
+    # check if db's encrypted
+    encrypted = False
+    if db_exists:
+        try:
+            with open(db_path, 'rb') as f:
+                first_block = f.read(32)
+            # Check: SQLite DB starts with "SQLite format 3" if it's not encrypted.
+            if not first_block.startswith(b"SQLite format 3"):
+                encrypted = True
+        except Exception:
+            encrypted = True
+
+    return {
+        "usbFound": True,
+        "dbExists": db_exists,
+        "encrypted": encrypted
+    }
+
+
+@app.post("/setupUSB")
+def setup_usb(data: dict):
+    key_hex = data.get("masterKey")
+    if not key_hex:
+        raise HTTPException(400, "masterKey is required")
+
+    try:
+        key = bytes.fromhex(key_hex)
+        if len(key) != 32:
+            raise ValueError
+    except Exception:
+        raise HTTPException(400, "masterKey must be 64 hexadecimal characters")
+
+    usb_path = find_usb_drive()
+    if not usb_path:
+        raise HTTPException(500, "No USB drive found.")
+
+    db_path = os.path.join(usb_path, "passwords.db")
+
+    if os.path.exists(db_path):
+        raise HTTPException(400, "Database already exists. Use /encryptUSB instead.")
+
+    create_database(usb_path)
+    encrypt_file(db_path, key)
+
+    return {"status": "success", "message": "Database created and encrypted."}
+
+
+@app.post("/encryptUSB")  # In case DB is  already created but not encrypted
+def encrypt_usb(data: dict):
+    key_hex = data.get("masterKey")
+    if not key_hex:
+        raise HTTPException(400, "masterKey is required")
+
+    try:
+        key = bytes.fromhex(key_hex)
+        if len(key) != 32:
+            raise ValueError
+    except Exception:
+        raise HTTPException(400, "masterKey must be 64 hexadecimal characters")
+
+    usb_path = find_usb_drive()
+    if not usb_path:
+        raise HTTPException(500, "No USB drive found.")
+
+    db_path = os.path.join(usb_path, "passwords.db")
+    if not os.path.exists(db_path):
+        raise HTTPException(404, "Database file does not exist.")
+
+    try:
+        with open(db_path, 'rb') as f:
+            sig = f.read(16)
+        if not sig.startswith(b"SQLite format 3"):
+            return {"status": "already_encrypted"}
+    except:
+        return {"status": "unknown", "message": "Failed to verify encryption state."}
+
+    encrypt_file(db_path, key)
+    return {"status": "success", "message": "Database encrypted."}
+
+
+
+
+
 # ---------- local runner --------------------------------------------
 if __name__ == "__main__":
     uvicorn.run("password_server:app", host="127.0.0.1", port=5000, reload=True)
