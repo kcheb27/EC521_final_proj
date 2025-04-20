@@ -3,7 +3,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const qs = (id) => document.getElementById(id);
 
-  /* ─────────On start, check for usb device───────── */
+  /* ---------On start, check for usb device--------- */
   chrome.runtime.sendMessage({ action: "checkAndInitUSB" }, (resp) => {
     if (!resp) return;
   
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   
 
-  /* ─────────── master‑key handling ─────────── */
+  /* ----------- master‑key handling ----------- */
   chrome.storage.local.get("masterKey", ({ masterKey }) => {
     if (masterKey) qs("masterKey").value = masterKey;
   });
@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.storage.local.set({ masterKey: key }, () => alert("Key saved."));
   };
 
-  /* ─────────── save credentials ─────────── */
+  /* ----------- save credentials ----------- */
   qs("save").onclick = () => {
     const payload = {
       action: "savePassword",
@@ -105,7 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  /* ─────────── show credentials ─────────── */
+  /* ----------- show credentials ----------- */
   qs("showPassword").onclick = () => {
     let site = qs("site").value.trim();
 
@@ -139,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  /* ─────────── import from USB (plain‑text dump) ─────────── */
+  /* ----------- import from USB (plain‑text dump) ----------- */
 
   // const loadBtn = document.getElementById("loadFromUSB");
   // const fileInput = document.getElementById("filePicker");
@@ -192,8 +192,8 @@ document.addEventListener("DOMContentLoaded", () => {
   //   reader.readAsText(file);
   // };
 
-  
-  /* ─────────── export to USB ─────────── */
+
+  /* ----------- export to USB ----------- */
   qs("saveToUSB")?.addEventListener("click", () =>
     chrome.runtime.sendMessage({ action: "exportToUSB" })
   );
