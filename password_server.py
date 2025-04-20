@@ -37,6 +37,7 @@ from Basic_USB_interface import (
     create_database,
     encrypt_file,
     decrypt_file,
+    derive_aes_key
 )
 
 # ---------- USB paths ------------------------------------------------
@@ -119,7 +120,7 @@ def save_password(data: dict):
     site      = data.get("site")
     username  = data.get("username")
     pw        = data.get("password")
-    key       = data.get("masterKey")
+    key       = derive_aes_key(data.get("masterKey")) # Derive AES key
     force     = bool(data.get("force"))          # allow optional overwrite
 
     if not all([site, username, pw, key]):
@@ -156,6 +157,7 @@ def save_password(data: dict):
 
 @app.get("/getPassword/{site}")
 def get_password(site: str, key: str = Query(..., alias="key")):
+    key = derive_aes_key(key) # Derive AES key
     def _lookup(conn: sqlite3.Connection):
         cur = conn.cursor()
         cur.execute(
@@ -173,6 +175,7 @@ def get_password(site: str, key: str = Query(..., alias="key")):
 def import_from_usb(payload: dict):
     items: t.List[dict] = payload.get("items", [])
     key: str = payload.get("masterKey")
+    key = derive_aes_key(key) # Derive AES key
     if not key or not items:
         raise HTTPException(400, "items[] and masterKey required")
 
@@ -191,6 +194,7 @@ def import_from_usb(payload: dict):
 
 @app.get("/exportToUSB", response_class=PlainTextResponse)
 def export_to_usb(key: str = Query(..., alias="key")):
+    key = derive_aes_key(key) # Derive AES key
     def _dump(conn: sqlite3.Connection):
         cur = conn.cursor()
         cur.execute("SELECT url, username, password FROM credentials")
@@ -233,7 +237,7 @@ def usb_status():
     USB_PATH = usb_path
     global DB_FILE
     DB_FILE = db_path
-    
+
     return {
         "usbFound": True,
         "dbExists": db_exists,
@@ -246,7 +250,8 @@ def usb_status():
 
 @app.post("/setupUSB")
 def setup_usb(data: dict):
-    key_hex = data.get("masterKey")
+    key_hex = data.get("masterKey") # which is now passphrase
+    key_hex = derive_aes_key(key_hex) # Derive 64-AES key
     if not key_hex:
         raise HTTPException(400, "masterKey is required")
 
@@ -274,7 +279,8 @@ def setup_usb(data: dict):
 
 @app.post("/encryptUSB")  # In case DB is  already created but not encrypted
 def encrypt_usb(data: dict):
-    key_hex = data.get("masterKey")
+    key_hex = data.get("masterKey") # which is now passphrase
+    key_hex = derive_aes_key(key_hex) # Derive 64-AES key
     if not key_hex:
         raise HTTPException(400, "masterKey is required")
 

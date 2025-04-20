@@ -317,7 +317,7 @@ def derive_aes_key(password: str, length: int = 32, iterations: int = 100_000) -
     Derive an AES key from a password for communication between frontend and backend
     This makes the same password always generate the same key.
     """
-    salt = b''  # No salt
+    salt = b'IL0V3EC52!'  
     key = pbkdf2_hmac(
         hash_name='sha256',
         password=password.encode(),
