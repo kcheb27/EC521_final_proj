@@ -101,6 +101,3 @@ This launches the API at `http://127.0.0.1:5000`
 
 ---
 
-## 📄 License
-
-MIT License – feel free to use, modify, and share.
