@@ -92,35 +92,35 @@ def _with_decrypted_db(hex_key: str, callback):
     • Work on a temp copy so the open window is tiny.
     • Re‑encrypt and clean up even if callback throws.
     """
-    # 1 – validate & decode the key
     try:
         key = bytes.fromhex(hex_key)
         if len(key) != 32:
             raise ValueError
     except (ValueError, binascii.Error):
-        raise HTTPException(400, "masterKey must be 64 hexadecimal characters")
+        raise HTTPException(400, "Invalid master key format. Must be 64 hex characters.")
 
-    # 2 – decrypt passwords.db in place
-    decrypt_file(DB_FILE, key)
+    try:
+        # Try to decrypt using the given key
+        decrypt_file(DB_FILE, key)
+    except Exception:
+        raise HTTPException(400, Exception + "Incorrect passphrase. Failed to decrypt database.")
 
-    # 3 – closed temp copy (Windows‑safe)
     fd, tmp_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)  # close the handle so we can delete later
+    os.close(fd)
     shutil.copyfile(DB_FILE, tmp_path)
 
     try:
-        # 4 – operate on the temp DB
         conn = sqlite3.connect(tmp_path)
-        result = callback(conn)  # user‑supplied function
+        result = callback(conn)
         conn.commit()
         conn.close()
 
-        # 5 – write back, re‑encrypt
         shutil.copyfile(tmp_path, DB_FILE)
         encrypt_file(DB_FILE, key)
         return result
     finally:
-        os.remove(tmp_path)  # succeeds on Windows because no handle is open
+        os.remove(tmp_path)
+
 
 
 # ---------- FastAPI setup -------------------------------------------
@@ -195,47 +195,47 @@ def get_password(site: str, key: str = Query(..., alias="key")):
     return {"entry": entry}
 
 
-@app.post("/importFromUSB")
-def import_from_usb(payload: dict):
-    items: t.List[dict] = payload.get("items", [])
-    key: str = payload.get("masterKey")
-    key = derive_aes_key(key) # Derive AES key
-    if not key or not items:
-        raise HTTPException(400, "items[] and masterKey required")
+# @app.post("/importFromUSB")
+# def import_from_usb(payload: dict):
+#     items: t.List[dict] = payload.get("items", [])
+#     key: str = payload.get("masterKey")
+#     key = derive_aes_key(key) # Derive AES key
+#     if not key or not items:
+#         raise HTTPException(400, "items[] and masterKey required")
 
-    def _bulk(conn: sqlite3.Connection):
-        conn.executemany(
-            """
-            INSERT OR REPLACE INTO credentials (url, username, password)
-            VALUES (?,?,?)
-            """,
-            [(i["site"], i["username"], i["password"]) for i in items],
-        )
+#     def _bulk(conn: sqlite3.Connection):
+#         conn.executemany(
+#             """
+#             INSERT OR REPLACE INTO credentials (url, username, password)
+#             VALUES (?,?,?)
+#             """,
+#             [(i["site"], i["username"], i["password"]) for i in items],
+#         )
 
-    _with_decrypted_db(key, _bulk)
-    return {"status": "imported", "count": len(items)}
+#     _with_decrypted_db(key, _bulk)
+#     return {"status": "imported", "count": len(items)}
 
 
-@app.get("/exportToUSB", response_class=PlainTextResponse)
-def export_to_usb(key: str = Query(..., alias="key")):
-    key = derive_aes_key(key) # Derive AES key
-    def _dump(conn: sqlite3.Connection):
-        cur = conn.cursor()
-        cur.execute("SELECT url, username, password FROM credentials")
-        rows = cur.fetchall()
-        lines = ["=== Saved Passwords ===", ""]
-        for i, (url, user, pw) in enumerate(rows, 1):
-            lines += [
-                f"Entry #{i}",
-                f"Website: {url}",
-                f"Username: {user}",
-                f"Password: {pw}",
-                "",
-            ]
-        lines.append(f"=== Total: {len(rows)} passwords ===")
-        return "\n".join(lines)
+# @app.get("/exportToUSB", response_class=PlainTextResponse)
+# def export_to_usb(key: str = Query(..., alias="key")):
+#     key = derive_aes_key(key) # Derive AES key
+#     def _dump(conn: sqlite3.Connection):
+#         cur = conn.cursor()
+#         cur.execute("SELECT url, username, password FROM credentials")
+#         rows = cur.fetchall()
+#         lines = ["=== Saved Passwords ===", ""]
+#         for i, (url, user, pw) in enumerate(rows, 1):
+#             lines += [
+#                 f"Entry #{i}",
+#                 f"Website: {url}",
+#                 f"Username: {user}",
+#                 f"Password: {pw}",
+#                 "",
+#             ]
+#         lines.append(f"=== Total: {len(rows)} passwords ===")
+#         return "\n".join(lines)
 
-    return _with_decrypted_db(key, _dump)
+#     return _with_decrypted_db(key, _dump)
 
 
 @app.get("/usbStatus") # Check if: usb plugged in, db exists, db encrypted. Update: When calling this function, it detects usb path and db path

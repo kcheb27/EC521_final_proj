@@ -77,8 +77,6 @@ This launches the API at `http://127.0.0.1:5000`
 |-----------------------|--------|-------------------------------------|
 | `/savePassword`       | POST   | Save or overwrite credentials       |
 | `/getPassword/{site}` | GET    | Retrieve credentials for a website |
-| `/importFromUSB`      | POST   | Import plaintext credentials list   |
-| `/exportToUSB`        | GET    | Export stored credentials (text)    |
 | `/setupUSB`           | POST   | Initialize and encrypt new database |
 | `/encryptUSB`         | POST   | Encrypt existing database           |
 | `/usbStatus`          | GET    | USB detection and status info       |
@@ -94,9 +92,12 @@ This launches the API at `http://127.0.0.1:5000`
 - Secure local storage of master key (Chrome local storage)
 
 ---
-## TODOs
+## Future Improvements
 
  - [] Automatically clearing Master key or allow manually clearing it
  - [] Add Prompt for setup process
+ - [] Encrypt the communication (extension <-> backend)
+ - [] Handle sign-up pages to autofill auto-genarated password
+
 ---
 

@@ -125,9 +125,21 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const fetchCred = (host) =>
-      chrome.runtime.sendMessage({ action: "getPassword", site: host }, (r) => {
-        r?.entry ? fill(r.entry) : alert(`No password saved for ${host}`);
-      });
+
+      chrome.runtime.sendMessage(
+        { action: "getPassword", site: host },
+        (r) => {
+          if (r?.entry) {
+            fill(r.entry);
+          } else if (r?.message) {
+            alert(`${r.message}`);
+          } else {
+            alert(`No password saved for ${host}`);
+          }
+        }
+
+      );
+
 
     if (site) {
       fetchCred(site);
