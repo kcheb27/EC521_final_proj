@@ -12,7 +12,7 @@ toggleMasterKeyButton.addEventListener("click", () => {
     toggleMasterKeyButton.textContent = "Hide";
   } else {
     masterKeyInput.type = "password";
-    toggleMasterKeyButton.textContent = "eye";
+    toggleMasterKeyButton.textContent = "Show";
   }
 });
 
