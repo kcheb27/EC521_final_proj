@@ -26,6 +26,11 @@ A Chrome extension that securely stores website credentials in an **AES‑256‑
 
 Ensure your USB stick is plugged in and mounted.
 
+**Option 1: Using Executable (Recommended)**  
+- Simply run the provided executable (`password_server.exe`) located in the project's root folder.
+
+**Option 2: Using Python Scripts**  
+
 ```
 pip install -r requirements.txt
 ```
