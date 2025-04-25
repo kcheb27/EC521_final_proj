@@ -27,7 +27,7 @@ A Chrome extension that securely stores website credentials in an **AES‑256‑
 Ensure your USB stick is plugged in and mounted.
 
 **Option 1: Using Executable (Recommended)**  
-- Simply run the provided executable (`password_server.exe`) located in the project's root folder.
+- Simply run the provided executable: [dist/windows/PocketVault.exe](dist/windows/PocketVault.exe)
 
 **Option 2: Using Python Scripts**  
 
