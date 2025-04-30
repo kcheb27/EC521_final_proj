@@ -95,14 +95,14 @@ This launches the API at `http://127.0.0.1:5000`
 - Manually view credentials from popup
 - Toggle password visibility in input fields
 - Secure local storage of master key (Chrome local storage)
+- Automatically clearing Master key or allow manually clearing it
 
 ---
 ## Future Improvements
 
- - [] Automatically clearing Master key or allow manually clearing it
- - [] Add Prompt for setup process
- - [] Encrypt the communication (extension <-> backend)
- - [] Handle sign-up pages to autofill auto-genarated password
+ -  Add Prompt for setup process
+ -  Encrypt the communication (extension <-> backend)
+ -  Handle sign-up pages to autofill auto-genarated password
 
 ---
 
